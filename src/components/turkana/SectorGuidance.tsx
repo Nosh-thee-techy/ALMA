@@ -128,8 +128,16 @@ export function SectorGuidance() {
                   t === activeTier && "bg-secondary/60",
                 )}
               >
-                <td className="whitespace-nowrap px-4 py-3 font-semibold">
-                  {guidanceTierLabel[t]}
+                <td className="whitespace-nowrap px-4 py-3">
+                  {/* Same tier badges as Dashboard/Communities so managers read risk the same way everywhere. */}
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full px-2 py-0.5 text-xs font-semibold",
+                      t === "compound" ? tierMeta.severe.badge : tierMeta[t].badge,
+                    )}
+                  >
+                    {guidanceTierLabel[t]}
+                  </span>
                 </td>
                 {sectorOrder.map((s) => (
                   <td key={s} className="px-4 py-3 text-muted-foreground">

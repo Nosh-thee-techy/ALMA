@@ -45,14 +45,14 @@ what it does — this matters for the hackathon judging on technical depth.
 
 ## Task 3 — New Page: Sector Guidance
 
-- [ ] Add a new route/page: `/sector-guidance` (or match existing 
+- [x] Add a new route/page: `/sector-guidance` (or match existing 
   routing convention in the repo, e.g. `/sectors`)
-- [ ] Add it to the nav bar after Simulator
-- [ ] Build a tab bar or toggle: Agriculture | Livestock | Fisheries | Health
-- [ ] Each tab pulls the CURRENT compound risk tier from the same mock 
+- [x] Add it to the nav bar after Simulator
+- [x] Build a tab bar or toggle: Agriculture | Livestock | Fisheries | Health
+- [x] Each tab pulls the CURRENT compound risk tier from the same mock 
   data source already used on the Dashboard page (do not create a 
   second source of truth for risk data)
-- [ ] Each tab displays one action card with sector-specific guidance, e.g.:
+- [x] Each tab displays one action card with sector-specific guidance, e.g.:
   - Agriculture: "Harvest mature crops within 36h. Clear drainage 
     channels near Omorate and Kalam."
   - Livestock: "Move herds to higher-ground corridor. Safe forage 
@@ -61,11 +61,11 @@ what it does — this matters for the hackathon judging on technical depth.
     boats above the 5m waterline."
   - Health: "Elevated waterborne disease risk in 3-5 days post-flood. 
     Prep water purification at affected health posts."
-- [ ] Below the tabs, add a matrix/table view: rows = severity tiers 
+- [x] Below the tabs, add a matrix/table view: rows = severity tiers 
   (Safe/Watch/Warning/Severe/Compound), columns = the 4 sectors, 
   cells = one-line action summary. This is the "at a glance" view for 
   a disaster manager reviewing all sectors at once.
-- [ ] Reuse existing severity color coding (Safe/Watch/Warning/Severe) 
+- [x] Reuse existing severity color coding (Safe/Watch/Warning/Severe) 
   already established on the Dashboard/Communities pages for consistency
 
 ## Task 4 — Simulator: Send Demo SMS
