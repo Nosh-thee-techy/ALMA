@@ -87,14 +87,14 @@ what it does — this matters for the hackathon judging on technical depth.
 
 ## Task 5 — Alerts Log: Verification Column
 
-- [ ] Add a new column "Verification" to the existing alerts table
-- [ ] Values: "Unconfirmed (model estimate)", "Confirmed (field report)", 
+- [x] Add a new column "Verification" to the existing alerts table
+- [x] Values: "Unconfirmed (model estimate)", "Confirmed (field report)", 
   "False alarm"
-- [ ] Color coding: gray = unconfirmed, green = confirmed, muted red = 
+- [x] Color coding: gray = unconfirmed, green = confirmed, muted red = 
   false alarm
-- [ ] Extend the existing mock alert data objects with a `verification` 
+- [x] Extend the existing mock alert data objects with a `verification` 
   field (don't restructure the existing table, just add the field + column)
-- [ ] This represents the two-way verification loop concept — ground 
+- [x] This represents the two-way verification loop concept — ground 
   truth feeding back into system confidence over time
 
 ---
