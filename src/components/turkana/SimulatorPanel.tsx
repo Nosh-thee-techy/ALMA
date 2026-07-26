@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
+import { sendDemoSms as sendDemoSmsFn } from "@/lib/send-demo-sms";
 import { computeCompound, tierFromMetric, tierMeta, type RiskTier } from "@/lib/turkana-data";
 import { cn } from "@/lib/utils";
 
@@ -42,28 +43,35 @@ export function SimulatorPanel() {
   const damTier = tierFromMetric(dam);
   const compound = useMemo(() => computeCompound(rainTier, damTier), [rainTier, damTier]);
 
-  // ---------------------------------------------------------------------
-  // SMS dispatch flow.
-  // In production this posts to the Africa's Talking sandbox SMS endpoint:
-  //   POST https://api.sandbox.africastalking.com/version1/messaging
-  //   headers: { apiKey: <AT_API_KEY>, Accept: application/json,
-  //              Content-Type: application/x-www-form-urlencoded }
-  //   body: username=sandbox&to=<phone>&message=<alert text>
-  // The call must happen server-side (a server function) so the API key is
-  // never exposed to the browser. No key is configured yet, so we stay in
-  // demo mode and simulate the dispatch confirmation locally.
-  // ---------------------------------------------------------------------
+  // SMS dispatch: server fn checks AT_API_KEY / AT_USERNAME and either
+  // posts to Africa's Talking sandbox or returns demo mode.
   async function sendDemoSms() {
     if (!phone.trim()) {
       toast.error("Enter a phone number first (e.g. +2547XXXXXXXX).");
       return;
     }
     setSending(true);
-    await new Promise((r) => setTimeout(r, 700));
-    setSending(false);
-    toast.success("Demo mode: SMS simulated", {
-      description: `Would deliver to ${phone} via Africa's Talking: "${messageFor(compound, "en")}"`,
-    });
+    try {
+      const message = messageFor(compound, "en");
+      const result = await sendDemoSmsFn({
+        data: { phone: phone.trim(), message },
+      });
+      if (result.mode === "demo") {
+        toast.success("Demo mode: SMS simulated", {
+          description: `Would deliver to ${phone} via Africa's Talking: "${message}"`,
+        });
+      } else {
+        toast.success("Demo SMS sent", {
+          description: `Delivered to ${phone} via Africa's Talking sandbox.`,
+        });
+      }
+    } catch (err) {
+      toast.error("SMS dispatch failed", {
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -158,7 +166,8 @@ export function SimulatorPanel() {
             {sending ? "Sending…" : "Send Demo SMS to This Number"}
           </Button>
           <p className="text-[11px] text-muted-foreground">
-            Demo mode — no live credentials configured. Routes via Africa's Talking once a key is added.
+            Uses Africa&apos;s Talking sandbox when <code>AT_API_KEY</code> / <code>AT_USERNAME</code> are set;
+            otherwise confirms with &quot;Demo mode: SMS simulated&quot;.
           </p>
         </div>
       </div>

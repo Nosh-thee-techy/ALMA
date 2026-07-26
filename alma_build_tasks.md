@@ -70,11 +70,11 @@ what it does — this matters for the hackathon judging on technical depth.
 
 ## Task 4 — Simulator: Send Demo SMS
 
-- [ ] On the existing Simulator page, below the sample alert message 
+- [x] On the existing Simulator page, below the sample alert message 
   output, add:
   - A phone number input field
   - A "Send Demo SMS to This Number" button
-- [ ] Implement using Africa's Talking sandbox API:
+- [x] Implement using Africa's Talking sandbox API:
   - If an API key/env var is present (e.g. `AT_API_KEY`, `AT_USERNAME`), 
     make a real POST request to their SMS sandbox endpoint
   - If no credentials are configured yet, show a toast/confirmation: 
@@ -82,7 +82,7 @@ what it does — this matters for the hackathon judging on technical depth.
     before credentials are added
   - Add a code comment marking exactly where the real API call goes, 
     so it's a one-line swap once credentials exist
-- [ ] Reference: Africa's Talking sandbox docs — 
+- [x] Reference: Africa's Talking sandbox docs — 
   https://developers.africastalking.com/docs/sms/sending
 
 ## Task 5 — Alerts Log: Verification Column
