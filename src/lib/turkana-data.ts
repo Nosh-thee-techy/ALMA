@@ -197,6 +197,7 @@ export const alerts: AlertRecord[] = [
     communities: ["Omorate", "Kalam", "Todonyang"],
     delivery: ["SMS", "USSD", "Radio", "Dashboard"],
     message: "COMPOUND FLOOD ALERT — move to higher ground within 12 hours.",
+    verification: "confirmed",
   },
   {
     id: "a2",
@@ -206,6 +207,7 @@ export const alerts: AlertRecord[] = [
     communities: ["Omorate", "Kalam"],
     delivery: ["SMS", "Dashboard"],
     message: "Heavy rainfall upstream. River rise expected in 8-12 hours.",
+    verification: "confirmed",
   },
   {
     id: "a3",
@@ -215,6 +217,7 @@ export const alerts: AlertRecord[] = [
     communities: ["Todonyang", "Nachukui", "Lowarengak"],
     delivery: ["SMS", "USSD"],
     message: "Gibe III controlled release detected. Monitor water levels.",
+    verification: "unconfirmed",
   },
   {
     id: "a4",
@@ -224,6 +227,7 @@ export const alerts: AlertRecord[] = [
     communities: ["Omorate"],
     delivery: ["Dashboard"],
     message: "Rainfall accumulation crossing watch threshold.",
+    verification: "unconfirmed",
   },
   {
     id: "a5",
@@ -233,6 +237,7 @@ export const alerts: AlertRecord[] = [
     communities: ["Kalam", "Todonyang", "Nachukui"],
     delivery: ["SMS", "USSD", "Dashboard"],
     message: "Combined rain + reservoir signal. Prepare evacuation routes.",
+    verification: "confirmed",
   },
   {
     id: "a6",
@@ -242,6 +247,7 @@ export const alerts: AlertRecord[] = [
     communities: ["Nachukui", "Lowarengak", "Kalokol"],
     delivery: ["SMS"],
     message: "Minor turbine release. No immediate downstream risk.",
+    verification: "false-alarm",
   },
 ];
 
