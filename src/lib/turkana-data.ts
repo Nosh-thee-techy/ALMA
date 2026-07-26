@@ -1,5 +1,6 @@
-// Mock data for Turkana Watch. Structured so it can later be swapped
-// for a real API (rainfall telemetry, dam SCADA feeds, community registry).
+// Mock data for ALMA (Automated Land & Moisture Action). Structured so it
+// can later be swapped for a real API (rainfall telemetry, dam SCADA feeds,
+// community registry).
 
 export type RiskTier = "safe" | "watch" | "warning" | "severe";
 export type Region = "turkana" | "omo" | "all";

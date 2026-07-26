@@ -128,9 +128,10 @@ export function AppShell({
           <span className="inline-flex items-center gap-2"><CloudRain className="h-3.5 w-3.5" /> Rainfall trigger</span>
           <span className="inline-flex items-center gap-2"><Dam className="h-3.5 w-3.5" /> Dam trigger</span>
           <span className="inline-flex items-center gap-2"><ShieldAlert className="h-3.5 w-3.5" /> Compound risk engine</span>
+          {/* Accuracy note: rainfall is CHIRPS-modeled; dam levels are prototype estimates — never imply live telemetry. */}
           <span className="ml-auto max-w-full text-right sm:max-w-[520px]">
-            Mock data · Field prototype · Rainfall data modeled on CHIRPS satellite estimates ·
-            Dam levels are simulated/estimated, not live telemetry
+            Rainfall data modeled on CHIRPS satellite estimates. Dam reservoir levels are
+            simulated/estimated for this prototype, not live telemetry.
           </span>
         </div>
       </footer>
