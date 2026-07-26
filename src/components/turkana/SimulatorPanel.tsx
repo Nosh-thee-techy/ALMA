@@ -1,8 +1,10 @@
 // SimulatorPanel: live compound risk demo. Two sliders drive the risk
 // calculation and produce a sample alert in three languages.
 import { useMemo, useState } from "react";
-import { CloudRain, Dam, ShieldAlert, Play } from "lucide-react";
+import { CloudRain, Dam, ShieldAlert, Play, Send } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { computeCompound, tierFromMetric, tierMeta, type RiskTier } from "@/lib/turkana-data";
 import { cn } from "@/lib/utils";
@@ -33,10 +35,36 @@ export function SimulatorPanel() {
   const [rain, setRain] = useState(45);
   const [dam, setDam] = useState(30);
   const [ran, setRan] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [sending, setSending] = useState(false);
 
   const rainTier = tierFromMetric(rain);
   const damTier = tierFromMetric(dam);
   const compound = useMemo(() => computeCompound(rainTier, damTier), [rainTier, damTier]);
+
+  // ---------------------------------------------------------------------
+  // SMS dispatch flow.
+  // In production this posts to the Africa's Talking sandbox SMS endpoint:
+  //   POST https://api.sandbox.africastalking.com/version1/messaging
+  //   headers: { apiKey: <AT_API_KEY>, Accept: application/json,
+  //              Content-Type: application/x-www-form-urlencoded }
+  //   body: username=sandbox&to=<phone>&message=<alert text>
+  // The call must happen server-side (a server function) so the API key is
+  // never exposed to the browser. No key is configured yet, so we stay in
+  // demo mode and simulate the dispatch confirmation locally.
+  // ---------------------------------------------------------------------
+  async function sendDemoSms() {
+    if (!phone.trim()) {
+      toast.error("Enter a phone number first (e.g. +2547XXXXXXXX).");
+      return;
+    }
+    setSending(true);
+    await new Promise((r) => setTimeout(r, 700));
+    setSending(false);
+    toast.success("Demo mode: SMS simulated", {
+      description: `Would deliver to ${phone} via Africa's Talking: "${messageFor(compound, "en")}"`,
+    });
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -111,6 +139,28 @@ export function SimulatorPanel() {
             to communities matching the compound tier.
           </div>
         )}
+
+        {/* Demo SMS dispatch — proves the end-to-end alert flow in the UI. */}
+        <div className="mt-5 space-y-2 rounded-md border border-border bg-background p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Demo dispatch
+          </p>
+          <Input
+            type="tel"
+            inputMode="tel"
+            placeholder="+254 7XX XXX XXX"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="h-9"
+          />
+          <Button onClick={sendDemoSms} disabled={sending} variant="secondary" className="w-full gap-2">
+            <Send className="h-4 w-4" />
+            {sending ? "Sending…" : "Send Demo SMS to This Number"}
+          </Button>
+          <p className="text-[11px] text-muted-foreground">
+            Demo mode — no live credentials configured. Routes via Africa's Talking once a key is added.
+          </p>
+        </div>
       </div>
     </div>
   );
