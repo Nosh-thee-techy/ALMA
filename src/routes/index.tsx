@@ -21,11 +21,11 @@ export const Route = createFileRoute("/")({
         content:
           "Dual-trigger flood early warning dashboard monitoring rainfall and Gibe III dam releases for the Omo River–Lake Turkana basin.",
       },
-      { property: "og:title", content: "Turkana Watch — Omo–Turkana flood EWS" },
+      { property: "og:title", content: "Turkana Watch — Omo–Turkana flood early warning" },
       {
         property: "og:description",
         content:
-          "Real-time compound flood risk for downstream communities on the Ethiopia–Kenya border.",
+          "Dual-trigger flood early warning dashboard monitoring rainfall and Gibe III dam releases for the Omo River–Lake Turkana basin.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

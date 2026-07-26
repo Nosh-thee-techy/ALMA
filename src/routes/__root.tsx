@@ -77,14 +77,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Turkana Watch — Omo–Turkana flood early warning" },
+      { name: "description", content: "Dual-trigger flood early warning dashboard monitoring rainfall and Gibe III dam releases for the Omo River–Lake Turkana basin." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Turkana Watch — Omo–Turkana flood early warning" },
+      { property: "og:description", content: "Dual-trigger flood early warning dashboard monitoring rainfall and Gibe III dam releases for the Omo River–Lake Turkana basin." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Turkana Watch — Omo–Turkana flood early warning" },
+      { name: "twitter:description", content: "Dual-trigger flood early warning dashboard monitoring rainfall and Gibe III dam releases for the Omo River–Lake Turkana basin." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9c623f63-b99d-4d9b-ac94-f41809978284/id-preview-696cae12--6348bee5-24ea-46c1-aebc-c34277ef3a0e.lovable.app-1784709485305.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9c623f63-b99d-4d9b-ac94-f41809978284/id-preview-696cae12--6348bee5-24ea-46c1-aebc-c34277ef3a0e.lovable.app-1784709485305.png" },
     ],
     links: [
       {
