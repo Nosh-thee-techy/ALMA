@@ -368,7 +368,8 @@ export const pilots: Pilot[] = [
     id: "northern-arid",
     label: "Northern Arid Lands (Coming Soon)",
     active: false,
-    hazardFocus: "Drought / NDVI-based grazing risk",
+    // Placeholder copy for judges — signals drought/grazing expansion without building real logic yet.
+    hazardFocus: "NDVI/soil-moisture drought and grazing risk",
   },
 ];
 

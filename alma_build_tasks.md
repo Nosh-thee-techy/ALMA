@@ -30,17 +30,17 @@ what it does — this matters for the hackathon judging on technical depth.
 
 ## Task 2 — Region/Pilot Select Dropdown
 
-- [ ] Add a dropdown to the nav bar (next to Dashboard/Alerts Log/
+- [x] Add a dropdown to the nav bar (next to Dashboard/Alerts Log/
   Communities/Simulator links)
-- [ ] Options: "Omo–Turkana (Active Pilot)" [default, functional], 
+- [x] Options: "Omo–Turkana (Active Pilot)" [default, functional], 
   "Tana River System (Coming Soon)", "Northern Arid Lands (Coming Soon)"
-- [ ] Selecting a "Coming Soon" option should NOT navigate away — show 
+- [x] Selecting a "Coming Soon" option should NOT navigate away — show 
   a simple placeholder card/modal instead:
   - Tana River: "Expansion zone — Seven Forks Hydro-Dam overflow 
     monitoring coming soon"
   - Northern Arid Lands: "Expansion zone — NDVI/soil-moisture drought 
     and grazing risk monitoring coming soon"
-- [ ] This is a scalability signal for judges — keep it lightweight, 
+- [x] This is a scalability signal for judges — keep it lightweight, 
   no need to build real logic for the other two regions
 
 ## Task 3 — New Page: Sector Guidance
