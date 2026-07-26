@@ -5,13 +5,13 @@ import { SimulatorPanel } from "@/components/turkana/SimulatorPanel";
 export const Route = createFileRoute("/simulator")({
   head: () => ({
     meta: [
-      { title: "Alert simulator — Turkana Watch" },
+      { title: "Alert simulator — ALMA" },
       {
         name: "description",
         content:
           "Interactive compound flood risk simulator: model rainfall and Gibe III reservoir changes and preview the resulting multilingual alert.",
       },
-      { property: "og:title", content: "Alert simulator — Turkana Watch" },
+      { property: "og:title", content: "Alert simulator — ALMA" },
       {
         property: "og:description",
         content: "Live compound-risk demo with sample alert messages in English, Swahili, and local language.",
