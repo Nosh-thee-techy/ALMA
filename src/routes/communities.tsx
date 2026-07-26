@@ -5,13 +5,13 @@ import { CommunityList } from "@/components/turkana/CommunityList";
 export const Route = createFileRoute("/communities")({
   head: () => ({
     meta: [
-      { title: "Communities — Turkana Watch" },
+      { title: "Communities — ALMA" },
       {
         name: "description",
         content:
           "Monitored downstream communities along the Omo River and Lake Turkana shoreline, with per-community flood propagation timing.",
       },
-      { property: "og:title", content: "Communities — Turkana Watch" },
+      { property: "og:title", content: "Communities — ALMA" },
       {
         property: "og:description",
         content: "Population, distances, and propagation ETAs for each monitored point.",

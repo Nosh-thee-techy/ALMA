@@ -4,6 +4,9 @@
 export type RiskTier = "safe" | "watch" | "warning" | "severe";
 export type Region = "turkana" | "omo" | "all";
 export type TriggerType = "rain" | "dam" | "compound";
+// Ground-truth verification state of a dispatched alert. This closes the
+// two-way loop: field reports feed back and adjust system confidence.
+export type VerificationState = "unconfirmed" | "confirmed" | "false-alarm";
 
 export interface TriggerStatus {
   tier: RiskTier;
@@ -39,6 +42,7 @@ export interface AlertRecord {
   communities: string[];
   delivery: Array<"SMS" | "USSD" | "Dashboard" | "Radio">;
   message: string;
+  verification: VerificationState;
 }
 
 export interface TrendPoint {
@@ -193,6 +197,7 @@ export const alerts: AlertRecord[] = [
     communities: ["Omorate", "Kalam", "Todonyang"],
     delivery: ["SMS", "USSD", "Radio", "Dashboard"],
     message: "COMPOUND FLOOD ALERT — move to higher ground within 12 hours.",
+    verification: "confirmed",
   },
   {
     id: "a2",
@@ -202,6 +207,7 @@ export const alerts: AlertRecord[] = [
     communities: ["Omorate", "Kalam"],
     delivery: ["SMS", "Dashboard"],
     message: "Heavy rainfall upstream. River rise expected in 8-12 hours.",
+    verification: "confirmed",
   },
   {
     id: "a3",
@@ -211,6 +217,7 @@ export const alerts: AlertRecord[] = [
     communities: ["Todonyang", "Nachukui", "Lowarengak"],
     delivery: ["SMS", "USSD"],
     message: "Gibe III controlled release detected. Monitor water levels.",
+    verification: "unconfirmed",
   },
   {
     id: "a4",
@@ -220,6 +227,7 @@ export const alerts: AlertRecord[] = [
     communities: ["Omorate"],
     delivery: ["Dashboard"],
     message: "Rainfall accumulation crossing watch threshold.",
+    verification: "unconfirmed",
   },
   {
     id: "a5",
@@ -229,6 +237,7 @@ export const alerts: AlertRecord[] = [
     communities: ["Kalam", "Todonyang", "Nachukui"],
     delivery: ["SMS", "USSD", "Dashboard"],
     message: "Combined rain + reservoir signal. Prepare evacuation routes.",
+    verification: "confirmed",
   },
   {
     id: "a6",
@@ -238,6 +247,7 @@ export const alerts: AlertRecord[] = [
     communities: ["Nachukui", "Lowarengak", "Kalokol"],
     delivery: ["SMS"],
     message: "Minor turbine release. No immediate downstream risk.",
+    verification: "false-alarm",
   },
 ];
 
@@ -305,3 +315,169 @@ export function tierFromMetric(v: number): RiskTier {
   if (v >= 30) return "watch";
   return "safe";
 }
+
+// ---------------------------------------------------------------------------
+// Verification metadata — display label + color coding for the alerts log.
+// ---------------------------------------------------------------------------
+export const verificationMeta: Record<
+  VerificationState,
+  { label: string; badge: string }
+> = {
+  unconfirmed: {
+    label: "Unconfirmed (model estimate)",
+    badge: "bg-muted text-muted-foreground border border-border",
+  },
+  confirmed: {
+    label: "Confirmed (field report)",
+    badge: "bg-risk-safe-bg text-risk-safe-foreground",
+  },
+  "false-alarm": {
+    label: "False alarm",
+    badge: "bg-risk-severe/15 text-risk-severe border border-risk-severe/40",
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Pilot zones. Only Omo–Turkana is wired to live mock data; the others are
+// scalability placeholders showing where the platform expands next.
+// ---------------------------------------------------------------------------
+export type PilotId = "omo-turkana" | "tana-river" | "northern-arid";
+
+export interface Pilot {
+  id: PilotId;
+  label: string;
+  active: boolean;
+  hazardFocus: string;
+}
+
+export const pilots: Pilot[] = [
+  {
+    id: "omo-turkana",
+    label: "Omo–Turkana (Active Pilot)",
+    active: true,
+    hazardFocus: "Rainfall + Gibe III dam release flooding",
+  },
+  {
+    id: "tana-river",
+    label: "Tana River System (Coming Soon)",
+    active: false,
+    hazardFocus: "Seven Forks Hydro-Dam overflow",
+  },
+  {
+    id: "northern-arid",
+    label: "Northern Arid Lands (Coming Soon)",
+    active: false,
+    hazardFocus: "Drought / NDVI-based grazing risk",
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Sector guidance. The compound risk tier is translated into concrete,
+// sector-specific actions so a disaster manager can brief each cluster lead.
+// `matrix` gives the one-line summary for every tier x sector combination
+// (including the "compound" pseudo-tier used when both triggers align).
+// ---------------------------------------------------------------------------
+export type SectorId = "agriculture" | "livestock" | "fisheries" | "health";
+export type GuidanceTier = RiskTier | "compound";
+
+export interface SectorDetail {
+  id: SectorId;
+  label: string;
+  headline: string;
+  action: string;
+  bullets: string[];
+}
+
+// Detailed action cards keyed by sector, for the CURRENT compound tier.
+export const sectorDetails: Record<SectorId, SectorDetail> = {
+  agriculture: {
+    id: "agriculture",
+    label: "Agriculture",
+    headline: "Harvest window closing",
+    action:
+      "Harvest mature crops within 36h. Clear drainage channels near Omorate and Kalam.",
+    bullets: [
+      "Prioritise sorghum and maize plots on the Omo floodplain terraces.",
+      "Move stored grain above the 5m waterline or to raised granaries.",
+      "Unblock feeder drains before the first surge to limit standing water.",
+    ],
+  },
+  livestock: {
+    id: "livestock",
+    label: "Livestock",
+    headline: "Move herds to high-ground corridor",
+    action:
+      "Move herds to higher-ground corridor. Safe forage available for 8 days at Lokitaung Ridge corridor.",
+    bullets: [
+      "Use the Todonyang–Lokitaung stock route; avoid the delta crossings.",
+      "Pre-position water trucking for 8 days of holding capacity.",
+      "Tag and register herds at the corridor entry point for post-flood return.",
+    ],
+  },
+  fisheries: {
+    id: "fisheries",
+    label: "Fisheries",
+    headline: "Surge arriving at Lake Delta",
+    action:
+      "Upstream surge arriving at Lake Delta in 18h. Anchor boats above the 5m waterline.",
+    bullets: [
+      "Suspend night fishing across the delta and northern shoreline.",
+      "Secure nets and outboard engines at Kalokol and Eliye Springs landings.",
+      "Expect turbid water and displaced catch for 5–7 days after the peak.",
+    ],
+  },
+  health: {
+    id: "health",
+    label: "Health",
+    headline: "Post-flood waterborne disease risk",
+    action:
+      "Elevated waterborne disease risk in 3-5 days post-flood. Prep water purification at affected health posts.",
+    bullets: [
+      "Stock aquatabs and ORS at Omorate, Todonyang and Lowarengak posts.",
+      "Brief community health volunteers on cholera and AWD case definitions.",
+      "Pre-identify referral routes that stay passable at peak water level.",
+    ],
+  },
+};
+
+// At-a-glance matrix: rows = severity tier, columns = sector.
+export const sectorMatrix: Record<GuidanceTier, Record<SectorId, string>> = {
+  safe: {
+    agriculture: "Normal operations. Routine drainage maintenance.",
+    livestock: "Normal grazing rotation on floodplain pasture.",
+    fisheries: "Normal fishing activity across the lake.",
+    health: "Routine surveillance. No additional stock needed.",
+  },
+  watch: {
+    agriculture: "Inspect drainage; plan an early harvest of mature plots.",
+    livestock: "Identify high-ground corridors and confirm forage.",
+    fisheries: "Check moorings; log boats going out on the delta.",
+    health: "Verify purification supplies at riverside posts.",
+  },
+  warning: {
+    agriculture: "Harvest mature crops now; move stored grain up.",
+    livestock: "Begin herd movement to the high-ground corridor.",
+    fisheries: "Anchor boats above the waterline; suspend night fishing.",
+    health: "Pre-position ORS and aquatabs; brief volunteers.",
+  },
+  severe: {
+    agriculture: "Abandon field work. Secure inputs and evacuate plots.",
+    livestock: "Complete evacuation of all herds to the corridor.",
+    fisheries: "All boats off the water; move gear to high ground.",
+    health: "Activate outbreak readiness; secure clean-water supply.",
+  },
+  compound: {
+    agriculture: "Rain + release overlap: 36h harvest window, then evacuate.",
+    livestock: "Immediate herd evacuation; 8-day forage at corridor.",
+    fisheries: "Surge in 18h — anchor above 5m line, clear the delta.",
+    health: "Prep purification now; disease spike expected 3–5 days out.",
+  },
+};
+
+export const guidanceTierLabel: Record<GuidanceTier, string> = {
+  safe: "Safe",
+  watch: "Watch",
+  warning: "Warning",
+  severe: "Severe",
+  compound: "Compound",
+};

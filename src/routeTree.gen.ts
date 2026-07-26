@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SimulatorRouteImport } from './routes/simulator'
+import { Route as SectorGuidanceRouteImport } from './routes/sector-guidance'
 import { Route as CommunitiesRouteImport } from './routes/communities'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as IndexRouteImport } from './routes/index'
@@ -23,6 +24,11 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 const SimulatorRoute = SimulatorRouteImport.update({
   id: '/simulator',
   path: '/simulator',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SectorGuidanceRoute = SectorGuidanceRouteImport.update({
+  id: '/sector-guidance',
+  path: '/sector-guidance',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CommunitiesRoute = CommunitiesRouteImport.update({
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/communities': typeof CommunitiesRoute
+  '/sector-guidance': typeof SectorGuidanceRoute
   '/simulator': typeof SimulatorRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/communities': typeof CommunitiesRoute
+  '/sector-guidance': typeof SectorGuidanceRoute
   '/simulator': typeof SimulatorRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
 }
@@ -60,19 +68,33 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/communities': typeof CommunitiesRoute
+  '/sector-guidance': typeof SectorGuidanceRoute
   '/simulator': typeof SimulatorRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/alerts' | '/communities' | '/simulator' | '/sitemap.xml'
+  fullPaths:
+    | '/'
+    | '/alerts'
+    | '/communities'
+    | '/sector-guidance'
+    | '/simulator'
+    | '/sitemap.xml'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/alerts' | '/communities' | '/simulator' | '/sitemap.xml'
+  to:
+    | '/'
+    | '/alerts'
+    | '/communities'
+    | '/sector-guidance'
+    | '/simulator'
+    | '/sitemap.xml'
   id:
     | '__root__'
     | '/'
     | '/alerts'
     | '/communities'
+    | '/sector-guidance'
     | '/simulator'
     | '/sitemap.xml'
   fileRoutesById: FileRoutesById
@@ -81,6 +103,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlertsRoute: typeof AlertsRoute
   CommunitiesRoute: typeof CommunitiesRoute
+  SectorGuidanceRoute: typeof SectorGuidanceRoute
   SimulatorRoute: typeof SimulatorRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
 }
@@ -99,6 +122,13 @@ declare module '@tanstack/react-router' {
       path: '/simulator'
       fullPath: '/simulator'
       preLoaderRoute: typeof SimulatorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sector-guidance': {
+      id: '/sector-guidance'
+      path: '/sector-guidance'
+      fullPath: '/sector-guidance'
+      preLoaderRoute: typeof SectorGuidanceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/communities': {
@@ -129,6 +159,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlertsRoute: AlertsRoute,
   CommunitiesRoute: CommunitiesRoute,
+  SectorGuidanceRoute: SectorGuidanceRoute,
   SimulatorRoute: SimulatorRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
 }

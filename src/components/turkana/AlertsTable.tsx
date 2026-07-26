@@ -4,7 +4,7 @@ import { CloudRain, Dam, ShieldAlert } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { alerts, tierMeta, type RiskTier, type TriggerType } from "@/lib/turkana-data";
+import { alerts, tierMeta, verificationMeta, type RiskTier, type TriggerType } from "@/lib/turkana-data";
 import { cn } from "@/lib/utils";
 
 const triggerIcon = { rain: CloudRain, dam: Dam, compound: ShieldAlert };
@@ -68,6 +68,7 @@ export function AlertsTable() {
             <TableHead>Timestamp</TableHead>
             <TableHead>Trigger</TableHead>
             <TableHead>Severity</TableHead>
+            <TableHead>Verification</TableHead>
             <TableHead>Communities</TableHead>
             <TableHead>Delivery</TableHead>
             <TableHead>Message</TableHead>
@@ -91,6 +92,17 @@ export function AlertsTable() {
                     {a.severity}
                   </span>
                 </TableCell>
+                {/* Ground-truth feedback loop: field reports confirm or retract model estimates. */}
+                <TableCell>
+                  <span
+                    className={cn(
+                      "inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium",
+                      verificationMeta[a.verification].badge,
+                    )}
+                  >
+                    {verificationMeta[a.verification].label}
+                  </span>
+                </TableCell>
                 <TableCell className="text-xs">{a.communities.join(", ")}</TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
@@ -107,7 +119,7 @@ export function AlertsTable() {
           })}
           {filtered.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+              <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                 No alerts match the current filters.
               </TableCell>
             </TableRow>

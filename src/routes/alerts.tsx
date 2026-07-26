@@ -5,13 +5,13 @@ import { AlertsTable } from "@/components/turkana/AlertsTable";
 export const Route = createFileRoute("/alerts")({
   head: () => ({
     meta: [
-      { title: "Alerts log — Turkana Watch" },
+      { title: "Alerts log — ALMA" },
       {
         name: "description",
         content:
           "Log of past flood alerts dispatched to downstream Omo–Turkana communities across SMS, USSD, and dashboard channels.",
       },
-      { property: "og:title", content: "Alerts log — Turkana Watch" },
+      { property: "og:title", content: "Alerts log — ALMA" },
       {
         property: "og:description",
         content: "Historical flood alerts and delivery status for basin communities.",

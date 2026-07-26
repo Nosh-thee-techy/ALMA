@@ -15,13 +15,13 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Turkana Watch — Omo–Turkana flood early warning" },
+      { title: "ALMA — Omo–Turkana flood early warning" },
       {
         name: "description",
         content:
           "Dual-trigger flood early warning dashboard monitoring rainfall and Gibe III dam releases for the Omo River–Lake Turkana basin.",
       },
-      { property: "og:title", content: "Turkana Watch — Omo–Turkana flood early warning" },
+      { property: "og:title", content: "ALMA — Omo–Turkana flood early warning" },
       {
         property: "og:description",
         content:
