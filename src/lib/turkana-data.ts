@@ -4,6 +4,9 @@
 export type RiskTier = "safe" | "watch" | "warning" | "severe";
 export type Region = "turkana" | "omo" | "all";
 export type TriggerType = "rain" | "dam" | "compound";
+// Ground-truth verification state of a dispatched alert. This closes the
+// two-way loop: field reports feed back and adjust system confidence.
+export type VerificationState = "unconfirmed" | "confirmed" | "false-alarm";
 
 export interface TriggerStatus {
   tier: RiskTier;
@@ -39,6 +42,7 @@ export interface AlertRecord {
   communities: string[];
   delivery: Array<"SMS" | "USSD" | "Dashboard" | "Radio">;
   message: string;
+  verification: VerificationState;
 }
 
 export interface TrendPoint {
