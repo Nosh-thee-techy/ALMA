@@ -1,41 +1,55 @@
 # ALMA — Automated Land & Moisture Action
 
-Dual-trigger (rainfall + Gibe III dam) flood early warning dashboard for the Omo River–Lake Turkana basin.
+Dual-trigger (rainfall + Gibe III dam) flood early warning for the Omo–Turkana basin.
+
+- **Website** = NGO / county / Red Cross ops desk  
+- **Farmers & pastoralists** = SMS, WhatsApp, USSD `*384*96428#`, voice (not the website)
 
 ## Run locally
 
-Requires [Node.js](https://nodejs.org/) and npm.
+### Web desk
 
-```sh
+```powershell
 npm install
-npm run dev
+npm run dev -- --host 127.0.0.1
 ```
 
-Then open the URL Vite prints (usually `http://localhost:5173`).
+Open http://127.0.0.1:8080/
 
-### Optional: Africa's Talking sandbox SMS
+### Engine (risk, USSD, voice, simulator, live rain)
 
-Copy `.env.example` to `.env` and set:
-
+```powershell
+cd engine
+.\.venv\Scripts\Activate.ps1
+$env:ALMA_FUNCTION_MODEL="gemma2:2b"
+$env:ALMA_ANALYST_MODEL="gemma2:2b"
+uvicorn main:app --reload --host 127.0.0.1 --port 8787
 ```
-AT_API_KEY=your_sandbox_key
-AT_USERNAME=sandbox
-```
 
-Without those vars, Simulator → **Send Demo SMS** stays in demo mode.
+- http://127.0.0.1:8787/health  
+- http://127.0.0.1:8787/api/dashboard/live-signals  
+- http://127.0.0.1:8787/docs  
+
+Full last-mile + ngrok steps: [DEMO_LAST_MILE.md](./DEMO_LAST_MILE.md) · Engine notes: [engine/README.md](./engine/README.md)
+
+### Optional env
+
+Copy `.env.example` → `.env`:
+
+- `AT_API_KEY` / `AT_USERNAME` — live SMS  
+- `AT_WHATSAPP_NUMBER` — WhatsApp (no sandbox)  
+- `ALMA_ENGINE_URL=http://127.0.0.1:8787`  
+- `DAM_TELEMETRY_URL` — optional partner dam JSON  
 
 ## Scripts
 
 | Command | Purpose |
 |---------|---------|
-| `npm run dev` | Dev server |
+| `npm run dev` | Web desk |
+| `npm run engine` | FastAPI engine (Windows venv path) |
 | `npm run build` | Production build |
-| `npm run preview` | Preview production build |
 | `npm run lint` | ESLint |
 
 ## Stack
 
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
+TanStack Start · React · TypeScript · Tailwind · FastAPI engine · Ollama Gemma (optional)
