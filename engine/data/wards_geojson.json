@@ -1,0 +1,70 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "ward_id": "kalokol",
+        "name": "Kalokol",
+        "county": "Turkana",
+        "country": "Kenya",
+        "sector_default": "fisher",
+        "safe_corridor": "High-Ground Corridor B · 8km EAST",
+        "forage_days": 8
+      },
+      "geometry": { "type": "Point", "coordinates": [35.75, 3.52] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward_id": "kangatotha",
+        "name": "Kangatotha",
+        "county": "Turkana",
+        "country": "Kenya",
+        "sector_default": "pastoralist",
+        "safe_corridor": "High-Ground Corridor A · 6km NORTH",
+        "forage_days": 10
+      },
+      "geometry": { "type": "Point", "coordinates": [35.68, 3.41] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward_id": "todonyang",
+        "name": "Todonyang",
+        "county": "Turkana",
+        "country": "Kenya",
+        "sector_default": "pastoralist",
+        "safe_corridor": "High-Ground Corridor C · 5km WEST",
+        "forage_days": 7
+      },
+      "geometry": { "type": "Point", "coordinates": [35.95, 4.45] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward_id": "omorate",
+        "name": "Omorate",
+        "county": "South Omo",
+        "country": "Ethiopia",
+        "sector_default": "farmer",
+        "safe_corridor": "Elevated terrace · 3km SOUTH of floodplain",
+        "forage_days": 5
+      },
+      "geometry": { "type": "Point", "coordinates": [36.05, 4.8] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "ward_id": "nachukui",
+        "name": "Nachukui",
+        "county": "Turkana",
+        "country": "Kenya",
+        "sector_default": "pastoralist",
+        "safe_corridor": "Ridge trail · 7km EAST",
+        "forage_days": 9
+      },
+      "geometry": { "type": "Point", "coordinates": [35.85, 3.95] }
+    }
+  ]
+}

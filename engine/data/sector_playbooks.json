@@ -1,0 +1,138 @@
+{
+  "cell_towers": {
+    "62001:101": "kalokol",
+    "62001:102": "kangatotha",
+    "62001:103": "todonyang",
+    "62001:104": "nachukui",
+    "63601:201": "omorate"
+  },
+  "playbooks": {
+    "pastoralist": {
+      "safe": {
+        "en": "River levels normal. Graze as usual. Dial *384*96428# if water rises.",
+        "sw": "Kiwango cha maji ni kawaida. Endelea kulisha mifugo. Piga *384*96428# maji yakiinuka.",
+        "trk": "[Turkana] Water normal. Graze usual. Call *384*96428# if rise.",
+        "orm": "[Oromo] Bishaan normal. Feed animals. *384*96428# yoo ol ka'e.",
+        "am": "[Amharic] የውሃ መጠን መደበኛ። *384*96428# ውሃ ከፍ ካለ።"
+      },
+      "watch": {
+        "en": "Rising water. Keep herds within 2 hours of high ground. Monitor ALMA.",
+        "sw": "Maji yanaongezeka. Weka mifugo karibu na mahali pa juu (saa 2).",
+        "trk": "[Turkana] Water rising. Stay near high ground.",
+        "orm": "[Oromo] Bishaan ol ka'aa. Ida'uu olaanaa dhiyeenyaatti turi.",
+        "am": "[Amharic] ውሃ እየጨመረ ነው። ከከፍተኛ ቦታ አቅራቢያ ይቆዩ።"
+      },
+      "warning": {
+        "en": "Flood likely 12–24h. Move herds to High-Ground Corridor. Safe forage ~8 days.",
+        "sw": "Mafuriko yanatarajiwa masaa 12–24. Hamisha mifugo korido ya juu. Malisho siku ~8.",
+        "trk": "[Turkana] Flood soon. Move herds high corridor.",
+        "orm": "[Oromo] Lolaa dhiyootti. Horii gara olaanaatti geessi.",
+        "am": "[Amharic] ጎርፍ በቅርብ። እንስሳትን ወደ ከፍተኛ መንገድ ያንቀሳቅሱ።"
+      },
+      "severe": {
+        "en": "COMPOUND FLOOD — move herds NOW 8km EAST to Corridor B. Water + forage 8 days.",
+        "sw": "MAFURIKO MAKALI — hamisha mifugo SASA km 8 MASHARIKI Korido B.",
+        "trk": "[Turkana] SEVERE — move herds EAST Corridor B now.",
+        "orm": "[Oromo] CIMA — horii amma gara Baha Corridor B.",
+        "am": "[Amharic] ከባድ ጎርፍ — እንስሳትን አሁን ወደ ምስራቅ Corridor B።"
+      }
+    },
+    "farmer": {
+      "safe": {
+        "en": "Fields safe. Continue normal harvest plans.",
+        "sw": "Mashamba salama. Endelea na mavuno ya kawaida.",
+        "trk": "[Turkana] Fields safe.",
+        "orm": "[Oromo] Qonnaa nageenya qaba.",
+        "am": "[Amharic] እርሻ ደህንነቱ የተጠበቀ ነው።"
+      },
+      "watch": {
+        "en": "Watch drainage near river plots. Bag seed & tools.",
+        "sw": "Angalia mifereji karibu na mto. Weka mbegu na zana.",
+        "trk": "[Turkana] Check drainage. Bag seed.",
+        "orm": "[Oromo] Fuula bishaanilaa ilaali.",
+        "am": "[Amharic] የፍሳሽ መስመሮችን ይቆጣጠሩ።"
+      },
+      "warning": {
+        "en": "Harvest mature crops within 36h. Clear drains near Omorate/Kalam.",
+        "sw": "Vuna mazao yaliyoiva ndani ya masaa 36. Safisha mifereji.",
+        "trk": "[Turkana] Harvest ripe crops in 36h.",
+        "orm": "[Oromo] Midhaan bilchaate saatii 36 keessatti haamii.",
+        "am": "[Amharic] የበሰሉ ሰብሎችን በ36 ሰዓት ውስጥ ይሰብስቡ።"
+      },
+      "severe": {
+        "en": "Leave floodplain plots now. Move grain to high storage. Do not cross swollen channels.",
+        "sw": "Acha mashamba ya bonde sasa. Hamisha nafaka mahali pa juu.",
+        "trk": "[Turkana] Leave low farms now.",
+        "orm": "[Oromo] Qonnaa gadii amma dhiisi.",
+        "am": "[Amharic] ዝቅተኛ እርሻዎችን አሁን ይተዉ።"
+      }
+    },
+    "fisher": {
+      "safe": {
+        "en": "Lake edge normal. Fish as usual; keep radio on.",
+        "sw": "Ziwa ni kawaida. Vua kawaida; weka redio.",
+        "trk": "[Turkana] Lake normal.",
+        "orm": "[Oromo] Haroo normal.",
+        "am": "[Amharic] ሐይቅ መደበኛ ነው።"
+      },
+      "watch": {
+        "en": "Watch lake rise. Secure nets above 3m waterline.",
+        "sw": "Angalia ziwa. Linda nyavu juu ya mita 3.",
+        "trk": "[Turkana] Watch lake. Secure nets.",
+        "orm": "[Oromo] Haroo ol ka'uu ilaali.",
+        "am": "[Amharic] የሐይቅ መጨመርን ይከታተሉ።"
+      },
+      "warning": {
+        "en": "Upstream surge ~18h to delta. Anchor boats above 5m waterline.",
+        "sw": "Mawimbi ya juu ~masaa 18. Funga boti juu ya mita 5.",
+        "trk": "[Turkana] Surge ~18h. Anchor high.",
+        "orm": "[Oromo] Dambalii ~18h. Doonii olaanaatti hidhi.",
+        "am": "[Amharic] ማዕበል ~18 ሰዓት። ጀልባዎችን ከ5ሜ በላይ ያስሩ።"
+      },
+      "severe": {
+        "en": "COMPOUND surge — pull boats now. No night fishing. High ground camps only.",
+        "sw": "Mawimbi makali — vuta boti sasa. Hakuna uvuvi usiku.",
+        "trk": "[Turkana] SEVERE — pull boats now.",
+        "orm": "[Oromo] CIMA — doonii amma harkisi.",
+        "am": "[Amharic] ከባድ ማዕበል — ጀልባዎችን አሁን ይጎትቱ።"
+      }
+    },
+    "health": {
+      "safe": {
+        "en": "No elevated waterborne risk. Maintain routine clinic stocks.",
+        "sw": "Hakuna hatari ya magonjwa ya maji. Dumisha dawa za kawaida.",
+        "trk": "[Turkana] Health routine OK.",
+        "orm": "[Oromo] Fayyaa normal.",
+        "am": "[Amharic] መደበኛ ጤና።"
+      },
+      "watch": {
+        "en": "Prep ORS and chlorine at riverside posts.",
+        "sw": "Andaa ORS na klorini kwenye vituo vya mtoni.",
+        "trk": "[Turkana] Prep ORS/chlorine.",
+        "orm": "[Oromo] ORS fi chlorine qopheessi.",
+        "am": "[Amharic] ORS እና ክሎሪን ያዘጋጁ።"
+      },
+      "warning": {
+        "en": "Waterborne disease risk rises 3–5 days post-flood. Stock purification kits.",
+        "sw": "Hatari ya magonjwa baada ya mafuriko siku 3–5. Weka vifaa vya kusafisha maji.",
+        "trk": "[Turkana] Disease risk after flood.",
+        "orm": "[Oromo] Dhukkuba bishaanii lolaa booda.",
+        "am": "[Amharic] ከጎርፍ በኋላ የበሽታ አደጋ።"
+      },
+      "severe": {
+        "en": "Activate cholera readiness. Move mobile clinics above flood line.",
+        "sw": "Washa utayari wa kolera. Hamisha kliniki juu ya mafuriko.",
+        "trk": "[Turkana] Cholera ready. Move clinics high.",
+        "orm": "[Oromo] Koleraa qopheessi. Klinikii olaanaatti geessi.",
+        "am": "[Amharic] የኮሌራ ዝግጁነት። ክሊኒኮችን ከፍ ያድርጉ።"
+      }
+    }
+  },
+  "ndvi_corridors": {
+    "kalokol": { "bearing": "EAST", "km": 8, "name": "Corridor B", "forage_days": 8, "ndvi": 0.42 },
+    "kangatotha": { "bearing": "NORTH", "km": 6, "name": "Corridor A", "forage_days": 10, "ndvi": 0.48 },
+    "todonyang": { "bearing": "WEST", "km": 5, "name": "Corridor C", "forage_days": 7, "ndvi": 0.39 },
+    "nachukui": { "bearing": "EAST", "km": 7, "name": "Ridge trail", "forage_days": 9, "ndvi": 0.44 },
+    "omorate": { "bearing": "SOUTH", "km": 3, "name": "Elevated terrace", "forage_days": 5, "ndvi": 0.35 }
+  }
+}
