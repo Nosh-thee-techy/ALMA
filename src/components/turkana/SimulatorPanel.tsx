@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import { sendDemoSms as sendDemoSmsFn } from "@/lib/send-demo-sms";
+import { damSliderToM3s, triggerSimulator } from "@/lib/trigger-simulator";
 import { computeCompound, tierFromMetric, tierMeta, type RiskTier } from "@/lib/turkana-data";
 import { cn } from "@/lib/utils";
 
@@ -38,13 +38,14 @@ export function SimulatorPanel() {
   const [ran, setRan] = useState(false);
   const [phone, setPhone] = useState("");
   const [sending, setSending] = useState(false);
+  const [channel, setChannel] = useState<"sms" | "whatsapp" | "both">("sms");
 
   const rainTier = tierFromMetric(rain);
   const damTier = tierFromMetric(dam);
   const compound = useMemo(() => computeCompound(rainTier, damTier), [rainTier, damTier]);
 
-  // SMS dispatch: server fn checks AT_API_KEY / AT_USERNAME and either
-  // posts to Africa's Talking sandbox or returns demo mode.
+  // Pitch dispatch → ALMA engine /api/simulator/trigger (risk + SMS).
+  // Falls back to TanStack SMS helper if the Python engine is offline.
   async function sendDemoSms() {
     if (!phone.trim()) {
       toast.error("Enter a phone number first (e.g. +2547XXXXXXXX).");
@@ -52,21 +53,32 @@ export function SimulatorPanel() {
     }
     setSending(true);
     try {
-      const message = messageFor(compound, "en");
-      const result = await sendDemoSmsFn({
-        data: { phone: phone.trim(), message },
+      const result = await triggerSimulator({
+        data: {
+          rain_mm: rain,
+          dam_discharge_m3s: damSliderToM3s(dam),
+          target_phone_number: phone.trim(),
+          sector: "pastoralist",
+          lang: "en",
+          channel,
+        },
       });
-      if (result.mode === "demo") {
-        toast.success("Demo mode: SMS simulated", {
-          description: `Would deliver to ${phone} via Africa's Talking: "${message}"`,
+      const sev = typeof result.severity === "number" ? result.severity.toFixed(0) : "—";
+      const via =
+        result.source === "engine"
+          ? `ALMA engine (${result.tier ?? compound}, ${sev}/100)`
+          : "SMS fallback (engine offline)";
+      if (result.mode === "demo" || result.mode === "error") {
+        toast.success("Demo mode: message simulated", {
+          description: `${via} via ${channel}: "${result.message}"`,
         });
       } else {
-        toast.success("Demo SMS sent", {
-          description: `Delivered to ${phone} via Africa's Talking sandbox.`,
+        toast.success("Demo message sent", {
+          description: `Delivered via ${via} (${channel}).`,
         });
       }
     } catch (err) {
-      toast.error("SMS dispatch failed", {
+      toast.error("Dispatch failed", {
         description: err instanceof Error ? err.message : "Unknown error",
       });
     } finally {
@@ -79,9 +91,10 @@ export function SimulatorPanel() {
       {/* Controls */}
       <div className="space-y-6 rounded-lg border border-border bg-card p-5">
         <div>
-          <h2 className="text-base font-semibold">Compound risk simulator</h2>
+          <h2 className="text-base font-semibold">Practice warning: rain + dam together</h2>
           <p className="text-xs text-muted-foreground">
-            Move the sliders to model how each trigger — and their overlap — drives the compound risk engine.
+            Move the sliders to see what happens when heavy rain and dam release happen at the same time.
+            Then send a demo SMS or WhatsApp to a phone.
           </p>
         </div>
 
@@ -95,8 +108,8 @@ export function SimulatorPanel() {
         />
         <SliderRow
           icon={Dam}
-          label="Simulated reservoir level change"
-          unit="% fill delta at Gibe III"
+          label="How much fuller the dam gets"
+          unit="Change in dam fullness at Gibe III (maps to release for the engine)"
           value={dam}
           onChange={setDam}
           tier={damTier}
@@ -123,13 +136,13 @@ export function SimulatorPanel() {
       >
         <div className="flex items-center gap-2">
           <ShieldAlert className="h-5 w-5" />
-          <h3 className="text-base font-semibold">Compound risk output</h3>
+          <h3 className="text-base font-semibold">Combined flood level</h3>
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-3 text-center text-xs">
           <TierChip label="Rainfall" tier={rainTier} />
           <TierChip label="Dam" tier={damTier} />
-          <TierChip label="Compound" tier={compound} big />
+          <TierChip label="Rain + dam" tier={compound} big />
         </div>
 
         <div className="mt-5 space-y-3">
@@ -143,8 +156,8 @@ export function SimulatorPanel() {
 
         {ran && (
           <div className="mt-4 rounded-md border border-border bg-background/60 p-3 text-xs text-muted-foreground">
-            Simulation dispatched. In production, this would trigger SMS + USSD fan-out
-            to communities matching the compound tier.
+            Simulation ready. In a real event this would send SMS, WhatsApp, and phone-menu
+            alerts to communities at this danger level.
           </div>
         )}
 
@@ -153,6 +166,26 @@ export function SimulatorPanel() {
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Demo dispatch
           </p>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                ["sms", "SMS"],
+                ["whatsapp", "WhatsApp"],
+                ["both", "SMS + WhatsApp"],
+              ] as const
+            ).map(([id, label]) => (
+              <Button
+                key={id}
+                type="button"
+                size="sm"
+                variant={channel === id ? "default" : "outline"}
+                className="h-8"
+                onClick={() => setChannel(id)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
           <Input
             type="tel"
             inputMode="tel"
@@ -163,11 +196,12 @@ export function SimulatorPanel() {
           />
           <Button onClick={sendDemoSms} disabled={sending} variant="secondary" className="w-full gap-2">
             <Send className="h-4 w-4" />
-            {sending ? "Sending…" : "Send Demo SMS to This Number"}
+            {sending ? "Sending…" : `Send demo ${channel === "both" ? "SMS + WhatsApp" : channel.toUpperCase()}`}
           </Button>
           <p className="text-[11px] text-muted-foreground">
-            Uses Africa&apos;s Talking sandbox when <code>AT_API_KEY</code> / <code>AT_USERNAME</code> are set;
-            otherwise confirms with &quot;Demo mode: SMS simulated&quot;.
+            Uses the ALMA engine on port 8787. SMS works with Africa&apos;s Talking sandbox keys.
+            WhatsApp needs a registered AT WhatsApp number (<code>AT_WHATSAPP_NUMBER</code>) — no sandbox;
+            without it, WhatsApp stays in demo mode.
           </p>
         </div>
       </div>
