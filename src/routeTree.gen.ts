@@ -9,31 +9,21 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as SimulatorRouteImport } from './routes/simulator'
-import { Route as SectorGuidanceRouteImport } from './routes/sector-guidance'
-import { Route as CommunitiesRouteImport } from './routes/communities'
-import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AlertsRouteImport } from './routes/alerts'
+import { Route as CommunitiesRouteImport } from './routes/communities'
+import { Route as DamRouteImport } from './routes/dam'
+import { Route as HomeRouteImport } from './routes/home'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as RainRouteImport } from './routes/rain'
+import { Route as SectorGuidanceRouteImport } from './routes/sector-guidance'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SimulatorRouteImport } from './routes/simulator'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SimulatorRoute = SimulatorRouteImport.update({
-  id: '/simulator',
-  path: '/simulator',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SectorGuidanceRoute = SectorGuidanceRouteImport.update({
-  id: '/sector-guidance',
-  path: '/sector-guidance',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CommunitiesRoute = CommunitiesRouteImport.update({
-  id: '/communities',
-  path: '/communities',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AlertsRoute = AlertsRouteImport.update({
@@ -41,9 +31,49 @@ const AlertsRoute = AlertsRouteImport.update({
   path: '/alerts',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const CommunitiesRoute = CommunitiesRouteImport.update({
+  id: '/communities',
+  path: '/communities',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DamRoute = DamRouteImport.update({
+  id: '/dam',
+  path: '/dam',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HomeRoute = HomeRouteImport.update({
+  id: '/home',
+  path: '/home',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RainRoute = RainRouteImport.update({
+  id: '/rain',
+  path: '/rain',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SectorGuidanceRoute = SectorGuidanceRouteImport.update({
+  id: '/sector-guidance',
+  path: '/sector-guidance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SimulatorRoute = SimulatorRouteImport.update({
+  id: '/simulator',
+  path: '/simulator',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -51,7 +81,12 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/communities': typeof CommunitiesRoute
+  '/dam': typeof DamRoute
+  '/home': typeof HomeRoute
+  '/login': typeof LoginRoute
+  '/rain': typeof RainRoute
   '/sector-guidance': typeof SectorGuidanceRoute
+  '/signup': typeof SignupRoute
   '/simulator': typeof SimulatorRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
 }
@@ -59,7 +94,12 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/communities': typeof CommunitiesRoute
+  '/dam': typeof DamRoute
+  '/home': typeof HomeRoute
+  '/login': typeof LoginRoute
+  '/rain': typeof RainRoute
   '/sector-guidance': typeof SectorGuidanceRoute
+  '/signup': typeof SignupRoute
   '/simulator': typeof SimulatorRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
 }
@@ -68,7 +108,12 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/communities': typeof CommunitiesRoute
+  '/dam': typeof DamRoute
+  '/home': typeof HomeRoute
+  '/login': typeof LoginRoute
+  '/rain': typeof RainRoute
   '/sector-guidance': typeof SectorGuidanceRoute
+  '/signup': typeof SignupRoute
   '/simulator': typeof SimulatorRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
 }
@@ -78,7 +123,12 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/communities'
+    | '/dam'
+    | '/home'
+    | '/login'
+    | '/rain'
     | '/sector-guidance'
+    | '/signup'
     | '/simulator'
     | '/sitemap.xml'
   fileRoutesByTo: FileRoutesByTo
@@ -86,7 +136,12 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/communities'
+    | '/dam'
+    | '/home'
+    | '/login'
+    | '/rain'
     | '/sector-guidance'
+    | '/signup'
     | '/simulator'
     | '/sitemap.xml'
   id:
@@ -94,7 +149,12 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/communities'
+    | '/dam'
+    | '/home'
+    | '/login'
+    | '/rain'
     | '/sector-guidance'
+    | '/signup'
     | '/simulator'
     | '/sitemap.xml'
   fileRoutesById: FileRoutesById
@@ -103,39 +163,23 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlertsRoute: typeof AlertsRoute
   CommunitiesRoute: typeof CommunitiesRoute
+  DamRoute: typeof DamRoute
+  HomeRoute: typeof HomeRoute
+  LoginRoute: typeof LoginRoute
+  RainRoute: typeof RainRoute
   SectorGuidanceRoute: typeof SectorGuidanceRoute
+  SignupRoute: typeof SignupRoute
   SimulatorRoute: typeof SimulatorRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/simulator': {
-      id: '/simulator'
-      path: '/simulator'
-      fullPath: '/simulator'
-      preLoaderRoute: typeof SimulatorRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sector-guidance': {
-      id: '/sector-guidance'
-      path: '/sector-guidance'
-      fullPath: '/sector-guidance'
-      preLoaderRoute: typeof SectorGuidanceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/communities': {
-      id: '/communities'
-      path: '/communities'
-      fullPath: '/communities'
-      preLoaderRoute: typeof CommunitiesRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/alerts': {
@@ -145,11 +189,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AlertsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/communities': {
+      id: '/communities'
+      path: '/communities'
+      fullPath: '/communities'
+      preLoaderRoute: typeof CommunitiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dam': {
+      id: '/dam'
+      path: '/dam'
+      fullPath: '/dam'
+      preLoaderRoute: typeof DamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/home': {
+      id: '/home'
+      path: '/home'
+      fullPath: '/home'
+      preLoaderRoute: typeof HomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rain': {
+      id: '/rain'
+      path: '/rain'
+      fullPath: '/rain'
+      preLoaderRoute: typeof RainRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sector-guidance': {
+      id: '/sector-guidance'
+      path: '/sector-guidance'
+      fullPath: '/sector-guidance'
+      preLoaderRoute: typeof SectorGuidanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/simulator': {
+      id: '/simulator'
+      path: '/simulator'
+      fullPath: '/simulator'
+      preLoaderRoute: typeof SimulatorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -159,10 +259,25 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlertsRoute: AlertsRoute,
   CommunitiesRoute: CommunitiesRoute,
+  DamRoute: DamRoute,
+  HomeRoute: HomeRoute,
+  LoginRoute: LoginRoute,
+  RainRoute: RainRoute,
   SectorGuidanceRoute: SectorGuidanceRoute,
+  SignupRoute: SignupRoute,
   SimulatorRoute: SimulatorRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

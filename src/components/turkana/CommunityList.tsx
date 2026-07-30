@@ -56,7 +56,7 @@ export function CommunityList() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-base font-semibold">{selected.name}</h3>
-              <p className="text-xs text-muted-foreground">{selected.region} · Lake Turkana basin</p>
+              <p className="text-xs text-muted-foreground">{selected.region} · Lake Turkana area</p>
             </div>
             <span
               className={cn(
@@ -73,18 +73,18 @@ export function CommunityList() {
             <Stat icon={Users} label="Population" value={selected.population.toLocaleString()} />
             <Stat icon={Radio} label="Last alert" value={selected.lastAlert} />
             <Stat icon={MapPin} label="From Gibe III" value={`${selected.distanceFromDamKm} km`} />
-            <Stat icon={MapPin} label="From catchment" value={`${selected.distanceFromCatchmentKm} km`} />
+            <Stat icon={MapPin} label="From rain area" value={`${selected.distanceFromCatchmentKm} km`} />
           </div>
 
           <div className="rounded-md border border-border bg-secondary/40 p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-              <Clock className="h-4 w-4" /> Propagation estimates
+              <Clock className="h-4 w-4" /> How soon floodwater may arrive
             </div>
             <div className="space-y-2 text-sm">
-              <PropRow label="Rainfall-driven flood" value={`${selected.rainEtaHours} hours`} tone="warning" />
-              <PropRow label="Dam-release surge" value={`${selected.damEtaHours} hours`} tone="watch" />
+              <PropRow label="From heavy rain" value={`${selected.rainEtaHours} hours`} tone="warning" />
+              <PropRow label="From dam release" value={`${selected.damEtaHours} hours`} tone="watch" />
               <PropRow
-                label="Compound window"
+                label="When both arrive together"
                 value={`${Math.min(selected.rainEtaHours, selected.damEtaHours)}–${Math.max(selected.rainEtaHours, selected.damEtaHours)}h`}
                 tone="severe"
               />

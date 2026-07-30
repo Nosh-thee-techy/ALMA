@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider } from "@/lib/auth";
 
 function NotFoundComponent() {
   return (
@@ -74,34 +75,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "ALMA — Omo–Turkana flood early warning" },
+      { title: "ALMA — Omo–Turkana early action" },
       {
         name: "description",
         content:
-          "Dual-trigger flood early warning dashboard monitoring rainfall and Gibe III dam releases for the Omo River–Lake Turkana basin.",
+          "Operator desk for NGO and county teams: Gibe III dam metrics, upstream rain, and clear next actions for the Omo–Turkana basin.",
       },
       { name: "author", content: "ALMA" },
-      { property: "og:title", content: "ALMA — Omo–Turkana flood early warning" },
-      {
-        property: "og:description",
-        content:
-          "Dual-trigger flood early warning dashboard monitoring rainfall and Gibe III dam releases for the Omo River–Lake Turkana basin.",
-      },
+      { property: "og:title", content: "ALMA — Omo–Turkana early action" },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "ALMA — Omo–Turkana flood early warning" },
-      {
-        name: "twitter:description",
-        content:
-          "Dual-trigger flood early warning dashboard monitoring rainfall and Gibe III dam releases for the Omo River–Lake Turkana basin.",
-      },
     ],
     links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "stylesheet", href: appCss },
+      { rel: "icon", href: "/alma-logo.png", type: "image/png" },
     ],
   }),
   shellComponent: RootShell,
@@ -129,9 +115,10 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-      <Toaster />
+      <AuthProvider>
+        <Outlet />
+        <Toaster />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

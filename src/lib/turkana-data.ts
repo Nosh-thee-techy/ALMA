@@ -64,18 +64,83 @@ export const rainfallTrigger: TriggerStatus = {
 export const damTrigger: TriggerStatus = {
   tier: "watch",
   label: "Watch",
-  detail: "Gibe III reservoir at 91% · controlled release forecast",
+  detail: "Gibe III is about 91% full · water is being released on purpose",
   etaHours: 22,
   trend: "up",
   metric: 58,
 };
 
+/**
+ * Current Gibe III operating picture — metrics first, alert second.
+ * Prototype values are simulated (not live SCADA / EEP telemetry).
+ */
+export interface DamMetrics {
+  name: string;
+  basin: string;
+  fillPercent: number;
+  waterLevelMasl: number;
+  fullSupplyMasl: number;
+  liveStorageBcm: number;
+  releaseM3s: number;
+  spillwayStatus: "closed" | "partial" | "open";
+  turbineStatus: string;
+  lastUpdatedLabel: string;
+  /** simulated = demo numbers; estimated = from live upstream rain proxy; live = partner feed */
+  dataQuality: "simulated" | "estimated" | "live";
+  plainSummary: string;
+}
+
+export const gibeIIIMetrics: DamMetrics = {
+  name: "Gibe III",
+  basin: "Omo River, Ethiopia",
+  fillPercent: 91,
+  waterLevelMasl: 889,
+  fullSupplyMasl: 892,
+  liveStorageBcm: 11.75,
+  releaseM3s: 420,
+  spillwayStatus: "partial",
+  turbineStatus: "Normal generation",
+  lastUpdatedLabel: "Demo dam numbers — not a live Gibe III feed (see Dam page for live alternatives)",
+  dataQuality: "simulated",
+  plainSummary:
+    "The dam lake is nearly full and some water is already being let out on purpose. This is the dam picture alone — not yet a flood alert by itself.",
+};
+
+/**
+ * Upstream rainfall picture — CHIRPS-style modeled numbers in this prototype.
+ * Not a live CHIRPS API pull yet.
+ */
+export interface RainMetrics {
+  catchmentName: string;
+  rain24hMm: number;
+  rain7dMm: number;
+  saturationPercent: number;
+  stationsReporting: number;
+  sourceLabel: string;
+  lastUpdatedLabel: string;
+  dataQuality: "modeled" | "live";
+  plainSummary: string;
+}
+
+export const upstreamRainMetrics: RainMetrics = {
+  catchmentName: "Upper Omo area above Gibe III",
+  rain24hMm: 62,
+  rain7dMm: 240,
+  saturationPercent: 78,
+  stationsReporting: 0,
+  sourceLabel: "Demo satellite rain estimate — engine can pull live Open-Meteo",
+  lastUpdatedLabel: "Demo estimate · use Live signals on Dam/Rain for Open-Meteo",
+  dataQuality: "modeled",
+  plainSummary:
+    "A lot of rain fell upstream in the last day. Soil is mostly wet, so new rain reaches the river faster. This is the rain picture alone.",
+};
+
 // Compound is elevated when both individual triggers are >= watch.
 export const compoundTrigger: TriggerStatus = {
   tier: "severe",
-  label: "Compound Severe",
+  label: "Severe — rain and dam together",
   detail:
-    "Rainfall + dam release windows overlap in ~14h. Downstream Turkana communities at extreme risk.",
+    "Heavy rain and dam release may hit the same area in about 14 hours. Communities near Lake Turkana need urgent action.",
   etaHours: 14,
   trend: "up",
   metric: 88,

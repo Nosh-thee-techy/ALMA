@@ -1,32 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/turkana/AppShell";
 import { AlertsTable } from "@/components/turkana/AlertsTable";
+import { RequireAuth } from "@/lib/require-auth";
 
 export const Route = createFileRoute("/alerts")({
   head: () => ({
-    meta: [
-      { title: "Alerts log — ALMA" },
-      {
-        name: "description",
-        content:
-          "Log of past flood alerts dispatched to downstream Omo–Turkana communities across SMS, USSD, and dashboard channels.",
-      },
-      { property: "og:title", content: "Alerts log — ALMA" },
-      {
-        property: "og:description",
-        content: "Historical flood alerts and delivery status for basin communities.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
+    meta: [{ title: "Alerts log — ALMA" }],
   }),
-  component: AlertsPage,
+  component: () => (
+    <RequireAuth>
+      <AppShell showRegion={false}>
+        <AlertsTable />
+      </AppShell>
+    </RequireAuth>
+  ),
 });
-
-function AlertsPage() {
-  return (
-    <AppShell showRegion={false}>
-      <AlertsTable />
-    </AppShell>
-  );
-}

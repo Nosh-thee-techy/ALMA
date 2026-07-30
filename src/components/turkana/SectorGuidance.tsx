@@ -75,7 +75,7 @@ export function SectorGuidance() {
                   </div>
                   <div>
                     <h3 className="text-base font-semibold">{d.headline}</h3>
-                    <p className="text-xs text-muted-foreground">{d.label} cluster guidance</p>
+                    <p className="text-xs text-muted-foreground">{d.label} sector guidance</p>
                   </div>
                   <span className={cn("ml-auto rounded-full px-2 py-0.5 text-xs font-semibold", badge)}>
                     {guidanceTierLabel[activeTier]}
@@ -103,7 +103,7 @@ export function SectorGuidance() {
       {/* At-a-glance matrix: every tier x sector action summary. */}
       <div className="overflow-x-auto rounded-lg border border-border bg-card">
         <div className="border-b border-border px-5 py-4">
-          <h3 className="text-sm font-semibold">Tier × sector action matrix</h3>
+          <h3 className="text-sm font-semibold">Actions by danger level and sector</h3>
           <p className="text-xs text-muted-foreground">
             Current tier row is highlighted. Use this to brief all four clusters at once.
           </p>

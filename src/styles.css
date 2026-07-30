@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap");
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
@@ -5,20 +6,13 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design system definition.
- *
- * The @theme inline block maps CSS custom properties to Tailwind utility
- * classes (e.g. --color-primary -> bg-primary, text-primary).
- *
- * The :root and .dark blocks define the actual color values using oklch.
- * All colors MUST use oklch format.
- *
- * To add a new semantic color:
- * 1. Add the variable to :root (light value) and .dark (dark value)
- * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ * ALMA visual world — Field Dispatch Desk
+ * Dust-lit county office under harsh daylight. High contrast. Hyperlegible type.
+ * River teal = water/system. Forage green = act. Risk ladder = hazard only.
  */
 
 @theme inline {
+  --font-sans: "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -71,89 +65,110 @@
   --color-risk-severe: var(--risk-severe);
   --color-risk-severe-foreground: var(--risk-severe-foreground);
   --color-risk-severe-bg: var(--risk-severe-bg);
+  --color-act: var(--act);
+  --color-act-foreground: var(--act-foreground);
+  --color-ink: var(--ink);
+  --color-dust: var(--dust);
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(0.985 0.005 220);
-  --foreground: oklch(0.18 0.03 240);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.03 240);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.03 240);
-  --primary: oklch(0.42 0.14 245);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.955 0.01 230);
-  --secondary-foreground: oklch(0.22 0.04 240);
-  --muted: oklch(0.955 0.01 230);
-  --muted-foreground: oklch(0.48 0.02 240);
-  --accent: oklch(0.94 0.03 230);
-  --accent-foreground: oklch(0.22 0.04 240);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.9 0.01 240);
-  --input: oklch(0.9 0.01 240);
-  --ring: oklch(0.55 0.14 245);
-  --risk-safe: oklch(0.68 0.17 150);
-  --risk-safe-foreground: oklch(0.2 0.05 150);
-  --risk-safe-bg: oklch(0.95 0.05 150);
-  --risk-watch: oklch(0.82 0.16 92);
-  --risk-watch-foreground: oklch(0.28 0.08 85);
-  --risk-watch-bg: oklch(0.97 0.07 95);
-  --risk-warning: oklch(0.72 0.18 55);
-  --risk-warning-foreground: oklch(0.28 0.1 45);
-  --risk-warning-bg: oklch(0.96 0.06 65);
-  --risk-severe: oklch(0.58 0.24 25);
-  --risk-severe-foreground: oklch(0.99 0 0);
-  --risk-severe-bg: oklch(0.94 0.08 25);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+  --radius: 0.5rem;
+  /* Turkana dust + shade — field office table */
+  --background: oklch(0.96 0.02 78);
+  --foreground: oklch(0.28 0.04 50);
+  --ink: oklch(0.28 0.04 50);
+  --dust: oklch(0.91 0.03 78);
+  --card: oklch(0.99 0.01 78);
+  --card-foreground: oklch(0.28 0.04 50);
+  --popover: oklch(0.99 0.01 78);
+  --popover-foreground: oklch(0.28 0.04 50);
+  /* River teal — matches ALMA logo */
+  --primary: oklch(0.45 0.08 210);
+  --primary-foreground: oklch(0.98 0.01 78);
+  --secondary: oklch(0.93 0.025 78);
+  --secondary-foreground: oklch(0.3 0.04 50);
+  --muted: oklch(0.93 0.025 78);
+  --muted-foreground: oklch(0.45 0.03 55);
+  --accent: oklch(0.9 0.035 78);
+  --accent-foreground: oklch(0.3 0.04 50);
+  --destructive: oklch(0.52 0.18 30);
+  --destructive-foreground: oklch(0.98 0.01 78);
+  --border: oklch(0.84 0.03 75);
+  --input: oklch(0.84 0.03 75);
+  --ring: oklch(0.5 0.08 210);
+  /* Acacia / forage green — act */
+  --act: oklch(0.44 0.1 150);
+  --act-foreground: oklch(0.98 0.01 150);
+  /* Risk ladder — hazard meaning only */
+  --risk-safe: oklch(0.55 0.12 150);
+  --risk-safe-foreground: oklch(0.28 0.06 150);
+  --risk-safe-bg: oklch(0.93 0.04 150);
+  --risk-watch: oklch(0.72 0.14 92);
+  --risk-watch-foreground: oklch(0.32 0.08 85);
+  --risk-watch-bg: oklch(0.95 0.06 95);
+  --risk-warning: oklch(0.65 0.16 55);
+  --risk-warning-foreground: oklch(0.32 0.1 45);
+  --risk-warning-bg: oklch(0.94 0.06 65);
+  --risk-severe: oklch(0.5 0.2 28);
+  --risk-severe-foreground: oklch(0.98 0.01 28);
+  --risk-severe-bg: oklch(0.93 0.05 28);
+  --chart-1: oklch(0.55 0.1 210);
+  --chart-2: oklch(0.55 0.1 55);
+  --chart-3: oklch(0.45 0.08 155);
+  --chart-4: oklch(0.7 0.08 85);
+  --chart-5: oklch(0.5 0.12 28);
+  --sidebar: oklch(0.97 0.015 85);
+  --sidebar-foreground: oklch(0.24 0.035 55);
+  --sidebar-primary: oklch(0.4 0.09 210);
+  --sidebar-primary-foreground: oklch(0.98 0.01 85);
+  --sidebar-accent: oklch(0.92 0.02 85);
+  --sidebar-accent-foreground: oklch(0.28 0.04 55);
+  --sidebar-border: oklch(0.82 0.025 80);
+  --sidebar-ring: oklch(0.45 0.09 210);
 }
 
 .dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(1 0 0 / 10%);
+  --background: oklch(0.22 0.03 55);
+  --foreground: oklch(0.95 0.015 85);
+  --card: oklch(0.28 0.03 55);
+  --card-foreground: oklch(0.95 0.015 85);
+  --popover: oklch(0.28 0.03 55);
+  --popover-foreground: oklch(0.95 0.015 85);
+  --primary: oklch(0.72 0.08 210);
+  --primary-foreground: oklch(0.2 0.04 210);
+  --secondary: oklch(0.32 0.03 55);
+  --secondary-foreground: oklch(0.95 0.015 85);
+  --muted: oklch(0.32 0.03 55);
+  --muted-foreground: oklch(0.75 0.02 85);
+  --accent: oklch(0.32 0.03 55);
+  --accent-foreground: oklch(0.95 0.015 85);
+  --destructive: oklch(0.65 0.18 28);
+  --destructive-foreground: oklch(0.98 0.01 28);
+  --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
+  --ring: oklch(0.65 0.08 210);
+  --act: oklch(0.65 0.12 155);
+  --act-foreground: oklch(0.18 0.04 155);
+  --risk-safe: oklch(0.7 0.12 150);
+  --risk-safe-foreground: oklch(0.9 0.04 150);
+  --risk-safe-bg: oklch(0.35 0.05 150);
+  --risk-watch: oklch(0.8 0.12 92);
+  --risk-watch-foreground: oklch(0.95 0.04 95);
+  --risk-watch-bg: oklch(0.35 0.05 95);
+  --risk-warning: oklch(0.75 0.14 55);
+  --risk-warning-foreground: oklch(0.95 0.04 55);
+  --risk-warning-bg: oklch(0.35 0.06 55);
+  --risk-severe: oklch(0.65 0.18 28);
+  --risk-severe-foreground: oklch(0.98 0.01 28);
+  --risk-severe-bg: oklch(0.35 0.06 28);
+  --sidebar: oklch(0.25 0.03 55);
+  --sidebar-foreground: oklch(0.95 0.015 85);
+  --sidebar-primary: oklch(0.72 0.08 210);
+  --sidebar-primary-foreground: oklch(0.2 0.04 210);
+  --sidebar-accent: oklch(0.32 0.03 55);
+  --sidebar-accent-foreground: oklch(0.95 0.015 85);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.65 0.08 210);
 }
 
 @layer base {
@@ -161,8 +176,13 @@
     border-color: var(--color-border);
   }
 
+  html {
+    font-family: var(--font-sans);
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-sans);
   }
 }

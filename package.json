@@ -9,7 +9,9 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "engine": "cd engine && .venv/Scripts/uvicorn.exe main:app --reload --host 127.0.0.1 --port 8787",
+    "engine:install": "cd engine && python -m venv .venv && .venv/Scripts/python.exe -m pip install -r requirements.txt"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

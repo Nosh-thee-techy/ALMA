@@ -11,7 +11,7 @@ const triggerIcon = { rain: CloudRain, dam: Dam, compound: ShieldAlert };
 const triggerLabel: Record<TriggerType, string> = {
   rain: "Rainfall",
   dam: "Dam release",
-  compound: "Compound",
+  compound: "Rain + dam",
 };
 
 export function AlertsTable() {
