@@ -1,44 +1,56 @@
 // SimulatorPanel: live compound risk demo. Two sliders drive the risk
 // calculation and produce a sample alert in three languages.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CloudRain, Dam, ShieldAlert, Play, Send } from "lucide-react";
 import { toast } from "sonner";
+import { LiveSourceBadge } from "@/components/turkana/LiveSourceBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
+import { useLiveBasin } from "@/hooks/use-live-basin";
 import { damSliderToM3s, triggerSimulator } from "@/lib/trigger-simulator";
 import { computeCompound, tierFromMetric, tierMeta, type RiskTier } from "@/lib/turkana-data";
 import { cn } from "@/lib/utils";
 
 function messageFor(tier: RiskTier, lang: "en" | "sw" | "local") {
   const en: Record<RiskTier, string> = {
-    safe: "All clear. River levels normal. No action needed.",
-    watch: "Rising water conditions. Monitor river levels and stay alert.",
-    warning: "Flood likely within 12–24 hours. Move livestock and valuables to higher ground.",
-    severe: "SEVERE FLOOD ALERT — evacuate low-lying areas immediately. Head to designated high ground.",
+    safe: "ALMA: River normal. No action. Dial *384*96428# if water rises.",
+    watch: "ALMA: Water rising. Stay near high ground. Dial *384*96428#.",
+    warning: "ALMA: Flood likely soon. Move people & animals to high ground. Dial *384*96428#.",
+    severe: "ALMA ALERT: Flood now. Leave low areas. Go to high ground. Dial *384*96428#.",
   };
   const sw: Record<RiskTier, string> = {
-    safe: "Hakuna hatari. Kiwango cha maji ni cha kawaida.",
-    watch: "Maji yanaongezeka. Endelea kuangalia mto na uwe tayari.",
-    warning: "Mafuriko yanatarajiwa ndani ya masaa 12–24. Hamishia mifugo na vitu vya thamani mahali pa juu.",
-    severe: "TAHADHARI KALI YA MAFURIKO — ondokeni katika maeneo ya chini mara moja. Nendeni mahali pa juu.",
+    safe: "ALMA: Maji ni kawaida. Hakuna hatari. Piga *384*96428# maji yakiinuka.",
+    watch: "ALMA: Maji yanaongezeka. Kaa karibu na mahali pa juu. Piga *384*96428#.",
+    warning: "ALMA: Mafuriko yanakuja. Hamisha watu na mifugo mahali pa juu. Piga *384*96428#.",
+    severe: "ALMA: Mafuriko SASA. Ondoka maeneo ya chini. Nenda juu. Piga *384*96428#.",
   };
   const local: Record<RiskTier, string> = {
-    safe: "[Ng'aturkana translation placeholder — safe]",
-    watch: "[Ng'aturkana translation placeholder — watch]",
-    warning: "[Ng'aturkana translation placeholder — warning]",
-    severe: "[Ng'aturkana translation placeholder — severe]",
+    safe: "[Ng'aturkana] Water normal. Dial *384*96428#.",
+    watch: "[Ng'aturkana] Water rising. Stay high. Dial *384*96428#.",
+    warning: "[Ng'aturkana] Flood soon. Move high. Dial *384*96428#.",
+    severe: "[Ng'aturkana] Flood NOW. Leave low ground. Dial *384*96428#.",
   };
   return { en, sw, local }[lang][tier];
 }
 
 export function SimulatorPanel() {
+  const { data, loading, error, isLive } = useLiveBasin();
   const [rain, setRain] = useState(45);
   const [dam, setDam] = useState(30);
+  const [seeded, setSeeded] = useState(false);
   const [ran, setRan] = useState(false);
   const [phone, setPhone] = useState("");
   const [sending, setSending] = useState(false);
-  const [channel, setChannel] = useState<"sms" | "whatsapp" | "both">("sms");
+  const [channel, setChannel] = useState<"sms" | "whatsapp" | "both">("whatsapp");
+
+  // Seed sliders once from live basin so rehearsal starts from reality.
+  useEffect(() => {
+    if (seeded || data.source !== "live" || !data.risk) return;
+    setRain(Math.round(Math.min(100, Number(data.risk.rain_score) || 0)));
+    setDam(Math.round(Math.min(100, Number(data.risk.dam_score) || 0)));
+    setSeeded(true);
+  }, [data, seeded]);
 
   const rainTier = tierFromMetric(rain);
   const damTier = tierFromMetric(dam);
@@ -90,12 +102,14 @@ export function SimulatorPanel() {
     <div className="grid gap-6 lg:grid-cols-2">
       {/* Controls */}
       <div className="space-y-6 rounded-lg border border-border bg-card p-5">
-        <div>
-          <h2 className="text-base font-semibold">Practice warning: rain + dam together</h2>
-          <p className="text-xs text-muted-foreground">
-            Move the sliders to see what happens when heavy rain and dam release happen at the same time.
-            Then send a demo SMS or WhatsApp to a phone.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="text-base font-semibold">Practice warning: rain + dam together</h2>
+            <p className="text-xs text-muted-foreground">
+              Sliders seed from live Open-Meteo risk when the engine is up. Adjust to rehearse SMS / WhatsApp.
+            </p>
+          </div>
+          <LiveSourceBadge isLive={isLive} loading={loading} error={error} />
         </div>
 
         <SliderRow
@@ -199,9 +213,8 @@ export function SimulatorPanel() {
             {sending ? "Sending…" : `Send demo ${channel === "both" ? "SMS + WhatsApp" : channel.toUpperCase()}`}
           </Button>
           <p className="text-[11px] text-muted-foreground">
-            Uses the ALMA engine on port 8787. SMS works with Africa&apos;s Talking sandbox keys.
-            WhatsApp needs a registered AT WhatsApp number (<code>AT_WHATSAPP_NUMBER</code>) — no sandbox;
-            without it, WhatsApp stays in demo mode.
+            Uses the ALMA engine on port 8787. WhatsApp sends via Twilio sandbox (join the sandbox
+            number first). SMS uses Africa&apos;s Talking or Twilio when configured.
           </p>
         </div>
       </div>

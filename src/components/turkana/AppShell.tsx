@@ -13,6 +13,7 @@ import {
   MapPinned,
   Menu,
   MessageSquareWarning,
+  PhoneCall,
   X,
 } from "lucide-react";
 import { AlmaLogo, AlmaMark } from "@/components/turkana/AlmaLogo";
@@ -29,8 +30,9 @@ const nav = [
   { to: "/rain", label: "Rain", hint: "Upstream rainfall", icon: CloudRain },
   { to: "/sector-guidance", label: "What to do", hint: "What each sector should do", icon: BookOpen },
   { to: "/simulator", label: "Warn people", hint: "SMS demo", icon: MessageSquareWarning },
+  { to: "/helpline", label: "Helpline", hint: "Voice agent for farmers", icon: PhoneCall },
   { to: "/alerts", label: "Alerts", hint: "Sent + verified", icon: Bell },
-  { to: "/communities", label: "Communities", hint: "Who is downstream", icon: MapPinned },
+  { to: "/communities", label: "Communities", hint: "Heat map + who is downstream", icon: MapPinned },
 ] as const;
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
@@ -195,7 +197,7 @@ export function AppShell({
               <Construction className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden />
               <h2 className="mt-3 text-lg font-bold">This pilot is not open yet</h2>
               <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-                Switch to Omo–Turkana in the menu. Dam numbers here are simulated for the prototype.
+                Switch to Omo–Turkana in the menu. Live pages use Open-Meteo rain + estimated dam pressure.
               </p>
             </div>
           )}

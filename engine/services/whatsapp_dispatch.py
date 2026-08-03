@@ -1,6 +1,6 @@
 """
-WhatsApp dispatch — Meta Cloud API preferred (no Africa's Talking WhatsApp needed).
-Falls back to Africa's Talking WhatsApp if META_* not set, then demo mode.
+WhatsApp dispatch — Meta / Twilio / Africa's Talking, then demo mode.
+Priority in auto: Meta → Twilio → Africa's Talking → demo.
 """
 from __future__ import annotations
 
@@ -10,9 +10,9 @@ from typing import Any
 
 import httpx
 
-from services import africastalking
+from services import africastalking, twilio_dispatch
 
-WHATSAPP_PROVIDER = os.getenv("WHATSAPP_PROVIDER", "auto").lower()  # auto | meta | africastalking | demo
+WHATSAPP_PROVIDER = os.getenv("WHATSAPP_PROVIDER", "auto").lower()  # auto | meta | twilio | africastalking | demo
 META_WA_TOKEN = os.getenv("META_WA_TOKEN", "")
 META_WA_PHONE_NUMBER_ID = os.getenv("META_WA_PHONE_NUMBER_ID", "")
 META_WA_API_VERSION = os.getenv("META_WA_API_VERSION", "v21.0")
@@ -76,6 +76,8 @@ def send_whatsapp(phone: str, message: str) -> dict[str, Any]:
     if provider == "auto":
         if META_WA_TOKEN and META_WA_PHONE_NUMBER_ID:
             provider = "meta"
+        elif twilio_dispatch.whatsapp_available():
+            provider = "twilio"
         elif os.getenv("AT_WHATSAPP_NUMBER"):
             provider = "africastalking"
         else:
@@ -83,6 +85,8 @@ def send_whatsapp(phone: str, message: str) -> dict[str, Any]:
 
     if provider == "meta":
         return send_meta(phone, message)
+    if provider == "twilio":
+        return twilio_dispatch.send_whatsapp(phone, message)
     if provider == "africastalking":
         out = africastalking.send_whatsapp(phone, message)
         out["provider"] = "africastalking"
@@ -94,7 +98,7 @@ def send_whatsapp(phone: str, message: str) -> dict[str, Any]:
         "to": phone,
         "message": message,
         "note": (
-            "WhatsApp demo — use Meta Cloud API (META_WA_TOKEN + META_WA_PHONE_NUMBER_ID) "
-            "or AT_WHATSAPP_NUMBER. Alternatives: Twilio WhatsApp, 360dialog, MessageBird."
+            "WhatsApp demo — set Twilio (TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN + "
+            "TWILIO_WHATSAPP_FROM), Meta Cloud API, or AT_WHATSAPP_NUMBER."
         ),
     }

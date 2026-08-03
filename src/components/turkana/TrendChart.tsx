@@ -1,4 +1,4 @@
-// TrendChart: supporting 7-day context — not the emotional end of the crisis path.
+// TrendChart: 7-day rain context — prefers live Open-Meteo series when provided.
 import {
   Area,
   AreaChart,
@@ -10,20 +10,23 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { trend } from "@/lib/turkana-data";
+import { trend as mockTrend, type TrendPoint } from "@/lib/turkana-data";
 
-export function TrendChart() {
+export function TrendChart({ data, live = false }: { data?: TrendPoint[]; live?: boolean }) {
+  const series = data && data.length > 0 ? data : mockTrend;
+
   return (
     <div className="bg-card">
       <div className="border-b border-border px-5 py-3">
-        <p className="text-sm font-bold">Rain vs reservoir fill</p>
+        <p className="text-sm font-bold">{live ? "Live rain vs pressure index" : "Rain vs reservoir fill"}</p>
         <p className="text-xs text-muted-foreground">
-          Left axis: rainfall mm/day · Right axis: Gibe III fill % (simulated)
+          Left axis: rainfall mm/day · Right axis:{" "}
+          {live ? "estimated pressure index (not Gibe SCADA %)" : "Gibe III fill % (simulated)"}
         </p>
       </div>
       <div className="h-64 p-4">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={trend} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+          <AreaChart data={series} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
             <defs>
               <linearGradient id="rainFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="var(--chart-2)" stopOpacity={0.35} />
@@ -43,8 +46,8 @@ export function TrendChart() {
               orientation="right"
               stroke="var(--muted-foreground)"
               fontSize={12}
-              domain={[70, 100]}
-              label={{ value: "%", position: "insideTopRight", offset: 0, fontSize: 11 }}
+              domain={[40, 100]}
+              label={{ value: live ? "idx" : "%", position: "insideTopRight", offset: 0, fontSize: 11 }}
             />
             <Tooltip
               contentStyle={{
@@ -68,7 +71,7 @@ export function TrendChart() {
               yAxisId="right"
               type="monotone"
               dataKey="reservoirPct"
-              name="Reservoir fill % (simulated)"
+              name={live ? "Pressure index" : "Reservoir fill % (simulated)"}
               stroke="var(--chart-1)"
               strokeWidth={2}
               dot={{ r: 3 }}

@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from services import gemma_ai, session_store
+from services import gemma_ai, session_store, voice_agent
 from services.live_signals import get_live_signals
 from services.playbook_loader import load_wards, ward_props
 from services.risk_engine import compute_compound_risk
@@ -22,6 +22,12 @@ class ParseIn(BaseModel):
     text: str
     phone: str | None = None
     ward_id: str | None = None
+
+
+class VoiceBriefIn(BaseModel):
+    ward_id: str | None = None
+    lang: str = "en"
+    sector: str | None = None
 
 
 @router.get("/api/dashboard/risk")
@@ -67,7 +73,11 @@ def live_signals():
 
 @router.get("/api/dashboard/ai-health")
 def ai_health():
-    return gemma_ai.health()
+    from services import twilio_dispatch
+
+    h = gemma_ai.health()
+    h["twilio"] = twilio_dispatch.health()
+    return h
 
 
 @router.get("/api/dashboard/actions")
@@ -103,3 +113,36 @@ def redeem_voucher(code: str):
 @router.get("/api/dashboard/cash-requests")
 def list_cash(limit: int = 50):
     return {"ok": True, "requests": session_store.list_cash_requests(limit)}
+
+
+@router.post("/api/dashboard/voice-brief")
+def voice_brief(body: VoiceBriefIn):
+    """Desk + helpline: short spoken breakdown of live risk for a ward."""
+    return voice_agent.brief_script(
+        ward_id=body.ward_id,
+        lang=body.lang or "en",
+        sector=body.sector,
+    )
+
+
+@router.get("/api/dashboard/voice-helpline")
+def voice_helpline_info():
+    return {
+        "ok": True,
+        "ussd": "*384*96428#",
+        "voice_callback": "/api/voice",
+        "menu": {
+            "1": "Live flood risk (plain language)",
+            "2": "What to do now",
+            "3": "Leave a river report",
+            "4": "Repeat menu",
+        },
+        "scripts": {
+            "sw": voice_agent.helpline_menu_script("sw"),
+            "en": voice_agent.helpline_menu_script("en"),
+        },
+        "note": (
+            "Point Africa's Talking Voice callback to PUBLIC_BASE_URL/api/voice. "
+            "Farmers without data use USSD; voice is the spoken helpline."
+        ),
+    }

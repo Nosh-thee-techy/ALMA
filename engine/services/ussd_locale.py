@@ -1,12 +1,7 @@
-"""USSD menus + short local-language action replies (Featherless with fast fallback)."""
+"""USSD menus + short action replies. Keep under ~140 chars — phones drop long USSD."""
 from __future__ import annotations
 
-import os
-import re
 from typing import Any
-
-from services import featherless_ai
-from services.playbook_loader import get_playbook_line
 
 LANGS = {
     "1": "en",
@@ -24,17 +19,23 @@ LANG_NAMES = {
     "am": "Amharic",
 }
 
-USSD_LOCALE_TIMEOUT_S = float(os.getenv("ALMA_USSD_LOCALE_TIMEOUT_S", "3.0"))
-USSD_MAX_CHARS = 160
+USSD_MAX_CHARS = 140
 
 
 def lang_from_code(code: str | None) -> str:
     return LANGS.get((code or "").strip(), "en")
 
 
+def _clip(text: str, limit: int = USSD_MAX_CHARS) -> str:
+    text = " ".join((text or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "."
+
+
 def language_menu() -> str:
     return (
-        "CON ALMA — Chagua lugha / Choose language:\n"
+        "CON ALMA - Choose language:\n"
         "1. English\n"
         "2. Kiswahili\n"
         "3. Turkana\n"
@@ -47,42 +48,42 @@ def main_menu(lang: str) -> str:
     menus = {
         "en": (
             "CON ALMA Early Action\n"
-            "1. Live flood risk\n"
-            "2. Confirm herd evacuation\n"
+            "1. Flood risk now\n"
+            "2. Confirm evacuation\n"
             "3. Report river level\n"
             "4. Claim feed voucher\n"
-            "5. Request emergency cash"
+            "5. Emergency cash"
         ),
         "sw": (
             "CON ALMA Hatua ya Mapema\n"
-            "1. Hatari ya mafuriko (moja kwa moja)\n"
-            "2. Thibitisha kuhamisha mifugo\n"
-            "3. Ripoti kiwango cha mto\n"
-            "4. Dai vocha ya malisho\n"
-            "5. Omba pesa za dharura"
+            "1. Hatari ya mafuriko\n"
+            "2. Thibitisha kuhama\n"
+            "3. Ripoti ya mto\n"
+            "4. Vocha ya malisho\n"
+            "5. Pesa za dharura"
         ),
         "trk": (
             "CON ALMA Early Action\n"
-            "1. Live flood risk\n"
+            "1. Flood risk now\n"
             "2. Confirm move herds\n"
-            "3. Report river water\n"
-            "4. Claim feed voucher\n"
-            "5. Ask emergency cash"
+            "3. Report river\n"
+            "4. Feed voucher\n"
+            "5. Emergency cash"
         ),
         "orm": (
             "CON ALMA Early Action\n"
-            "1. Balaa lolaa ammaa\n"
-            "2. Mirkanessuu socho'insa horii\n"
-            "3. Gabaasa sadarkaa laga\n"
-            "4. Voucher nyaata gaafachuu\n"
+            "1. Balaa lolaa\n"
+            "2. Mirkanessuu socho'insa\n"
+            "3. Gabaasa laga\n"
+            "4. Voucher nyaata\n"
             "5. Maallaqa hatattamaa"
         ),
         "am": (
             "CON ALMA early action\n"
-            "1. Live flood risk\n"
+            "1. Flood risk now\n"
             "2. Confirm herd move\n"
-            "3. Report river level\n"
-            "4. Claim feed voucher\n"
+            "3. Report river\n"
+            "4. Feed voucher\n"
             "5. Emergency cash"
         ),
     }
@@ -103,36 +104,37 @@ def ward_menu(lang: str) -> str:
     )
 
 
-def confirm_evac_menu(lang: str, ward_name: str, corr: dict[str, Any]) -> str:
+def confirm_evac_menu(lang: str, ward_name: str, corr: dict[str, Any] | None) -> str:
+    corr = corr or {}
     km = corr.get("km", 8)
     bearing = corr.get("bearing", "EAST")
     name = corr.get("name", "Corridor B")
     lines = {
         "en": (
-            f"CON Move herds now from {ward_name}?\n"
+            f"CON Move herds from {ward_name}?\n"
             f"{km}km {bearing} to {name}.\n"
-            "1. YES — start evacuation\n"
+            "1. YES\n"
             "2. Cancel"
         ),
         "sw": (
-            f"CON Hamisha mifugo sasa kutoka {ward_name}?\n"
-            f"km {km} {bearing} kwenda {name}.\n"
-            "1. NDIO — anza kuhama\n"
+            f"CON Hamisha mifugo {ward_name}?\n"
+            f"km {km} {bearing} {name}.\n"
+            "1. NDIO\n"
             "2. Ghairi"
         ),
         "trk": (
-            f"CON Move herds now {ward_name}?\n"
-            f"{km}km {bearing} to {name}.\n"
+            f"CON Move herds {ward_name}?\n"
+            f"{km}km {bearing} {name}.\n"
             "1. YES\n2. Cancel"
         ),
         "orm": (
-            f"CON Horii amma {ward_name} irraa sochoosi?\n"
-            f"km {km} {bearing} gara {name}.\n"
+            f"CON Horii {ward_name} sochoosi?\n"
+            f"km {km} {bearing} {name}.\n"
             "1. EEYYEE\n2. Haquu"
         ),
         "am": (
-            f"CON Move herds now from {ward_name}?\n"
-            f"{km}km {bearing} to {name}.\n"
+            f"CON Move herds {ward_name}?\n"
+            f"{km}km {bearing} {name}.\n"
             "1. YES\n2. Cancel"
         ),
     }
@@ -142,37 +144,26 @@ def confirm_evac_menu(lang: str, ward_name: str, corr: dict[str, Any]) -> str:
 def confirm_cash_menu(lang: str, amount_kes: int = 2000) -> str:
     lines = {
         "en": (
-            f"CON Request KES {amount_kes} early-action cash?\n"
-            "STK Push will be prepared for this phone.\n"
-            "1. YES — send STK\n"
+            f"CON Request KES {amount_kes} cash?\n"
+            "1. YES - send STK\n"
             "2. Cancel"
         ),
         "sw": (
-            f"CON Omba KES {amount_kes} za dharura?\n"
-            "STK Push itaandaliwa kwa simu hii.\n"
-            "1. NDIO — tuma STK\n"
+            f"CON Omba KES {amount_kes}?\n"
+            "1. NDIO - tuma STK\n"
             "2. Ghairi"
         ),
-        "trk": (
-            f"CON Ask KES {amount_kes} cash?\n"
-            "1. YES STK\n2. Cancel"
-        ),
-        "orm": (
-            f"CON KES {amount_kes} gaafadhu?\n"
-            "1. EEYYEE STK\n2. Haquu"
-        ),
-        "am": (
-            f"CON Request KES {amount_kes} cash?\n"
-            "1. YES STK\n2. Cancel"
-        ),
+        "trk": f"CON Ask KES {amount_kes}?\n1. YES\n2. Cancel",
+        "orm": f"CON KES {amount_kes}?\n1. EEYYEE\n2. Haquu",
+        "am": f"CON Request KES {amount_kes}?\n1. YES\n2. Cancel",
     }
     return lines.get(lang) or lines["en"]
 
 
 def report_prompt(lang: str) -> str:
     lines = {
-        "en": "CON Type river report in your language\n(e.g. Water high at Node 3, cattle stuck):",
-        "sw": "CON Andika ripoti ya mto kwa lugha yako\n(mf. Maji juu Node 3, ng'ombe wamekwama):",
+        "en": "CON Type short river report\n(e.g. Water high Node 3):",
+        "sw": "CON Andika ripoti fupi\n(mf. Maji juu Node 3):",
         "trk": "CON Type river report\n(e.g. Water high Node 3):",
         "orm": "CON Gabaasa laga barreessi\n(fkn. Bishaan ol Node 3):",
         "am": "CON Type river report\n(e.g. Water high Node 3):",
@@ -202,68 +193,54 @@ def invalid(lang: str, dial: str) -> str:
     return msg.get(lang) or msg["en"]
 
 
-def _clip(text: str, limit: int = USSD_MAX_CHARS) -> str:
-    text = re.sub(r"\s+", " ", (text or "").strip())
-    if len(text) <= limit:
-        return text
-    return text[: limit - 1].rstrip() + "…"
-
-
-def _fallback_action(lang: str, kind: str, facts: dict[str, Any]) -> str:
-    tier = str(facts.get("tier") or "watch")
+def localize_action(lang: str, kind: str, facts: dict[str, Any]) -> str:
+    """Fast static replies only — no LLM (USSD must answer in <5s)."""
+    tier = str(facts.get("tier") or "watch").upper()
     ward = str(facts.get("ward") or "ward")
-    rain = facts.get("rain_mm", "?")
-    dam = facts.get("dam_m3s", "?")
-    sector = str(facts.get("sector") or "pastoralist")
-    play = get_playbook_line(sector, tier, lang if lang in ("en", "sw", "trk", "orm", "am") else "en")
 
     if kind == "risk":
         templates = {
-            "en": f"LIVE risk {tier.upper()} at {ward}. Rain {rain}mm, dam~{dam} m3/s. {play}",
-            "sw": f"HATARI {tier.upper()} {ward}. Mvua {rain}mm, bwawa~{dam}. {play}",
-            "trk": f"LIVE {tier.upper()} {ward}. Rain {rain}mm. {play}",
-            "orm": f"BALAA {tier.upper()} {ward}. Rooba {rain}mm. {play}",
-            "am": f"LIVE {tier.upper()} {ward}. Rain {rain}mm. {play}",
+            "en": f"{ward}: flood {tier}. Move to high ground if water rises. *384*96428#",
+            "sw": f"{ward}: mafuriko {tier}. Nenda mahali pa juu. *384*96428#",
+            "trk": f"{ward}: flood {tier}. Go high ground. *384*96428#",
+            "orm": f"{ward}: balaa {tier}. Gara olaanaatti. *384*96428#",
+            "am": f"{ward}: flood {tier}. Go high ground. *384*96428#",
         }
         return _clip(templates.get(lang) or templates["en"])
 
     if kind == "evac":
         corr = facts.get("corridor") or {}
+        km = corr.get("km", 8)
+        bearing = corr.get("bearing", "EAST")
+        name = corr.get("name", "Corridor B")
         templates = {
-            "en": (
-                f"EVACUATION LOGGED for {ward}. Move herds {corr.get('km')}km "
-                f"{corr.get('bearing')} to {corr.get('name')} now. Forage ~{corr.get('forage_days')} days."
-            ),
-            "sw": (
-                f"KUHAMA KUMEANDIKWA {ward}. Hamisha mifugo km {corr.get('km')} "
-                f"{corr.get('bearing')} {corr.get('name')} sasa. Malisho siku ~{corr.get('forage_days')}."
-            ),
-            "trk": f"EVACUATION saved {ward}. Move {corr.get('km')}km {corr.get('bearing')} {corr.get('name')}.",
-            "orm": f"SOCHO'INSI galmeeffame {ward}. km {corr.get('km')} {corr.get('bearing')} {corr.get('name')}.",
-            "am": f"EVACUATION logged {ward}. Move {corr.get('km')}km {corr.get('bearing')} {corr.get('name')}.",
+            "en": f"Evacuation logged {ward}. Move herds {km}km {bearing} to {name} now.",
+            "sw": f"Kuhama kumeandikwa {ward}. Hamisha mifugo km {km} {bearing} {name}.",
+            "trk": f"Evacuation saved {ward}. Move {km}km {bearing} {name}.",
+            "orm": f"Socho'insi galmeeffame {ward}. km {km} {bearing} {name}.",
+            "am": f"Evacuation logged {ward}. Move {km}km {bearing} {name}.",
         }
         return _clip(templates.get(lang) or templates["en"])
 
     if kind == "report":
         status = facts.get("status", "recorded")
-        entity = facts.get("entity", "community")
         templates = {
-            "en": f"Thank you. ALMA saved your report: {status} ({entity}). Ops desk updated.",
-            "sw": f"Asante. ALMA imehifadhi ripoti: {status} ({entity}). Ofisi imesasishwa.",
-            "trk": f"Thanks. Report saved: {status} ({entity}).",
-            "orm": f"Galatoomi. Gabaasni olkaa'ame: {status} ({entity}).",
-            "am": f"Thank you. Report saved: {status} ({entity}).",
+            "en": f"Thanks. Report saved: {status}. Ops desk updated.",
+            "sw": f"Asante. Ripoti imehifadhiwa: {status}.",
+            "trk": f"Thanks. Report saved: {status}.",
+            "orm": f"Galatoomi. Gabaasni olkaa'ame: {status}.",
+            "am": f"Thanks. Report saved: {status}.",
         }
         return _clip(templates.get(lang) or templates["en"])
 
     if kind == "voucher":
         code = facts.get("code", "")
         templates = {
-            "en": f"VOUCHER READY. Code {code}. Show at agro-vet hub within 72h. Phone linked.",
-            "sw": f"VOCHA TAYARI. Nambari {code}. Onyesha kituo cha agro-vet ndani ya saa 72.",
-            "trk": f"VOUCHER {code}. Show hub in 72h.",
-            "orm": f"VOUCHER {code}. Sa'aatii 72 keessatti agarsiisi.",
-            "am": f"VOUCHER {code}. Show hub within 72h.",
+            "en": f"Voucher ready: {code}. Show at hub within 72h.",
+            "sw": f"Vocha tayari: {code}. Onyesha kituo ndani ya saa 72.",
+            "trk": f"Voucher {code}. Show hub in 72h.",
+            "orm": f"Voucher {code}. Sa'aatii 72 keessatti agarsiisi.",
+            "am": f"Voucher {code}. Show hub within 72h.",
         }
         return _clip(templates.get(lang) or templates["en"])
 
@@ -271,39 +248,12 @@ def _fallback_action(lang: str, kind: str, facts: dict[str, Any]) -> str:
         amount = facts.get("amount_kes", 2000)
         ref = facts.get("ref", "")
         templates = {
-            "en": (
-                f"CASH REQUEST LOGGED KES {amount}. Ref {ref}. "
-                "STK Push demo queued for this phone (confirm PIN when live)."
-            ),
-            "sw": (
-                f"OMBI LA PESA KES {amount}. Ref {ref}. "
-                "STK Push imeandaliwa (demo). Thibitisha PIN ikiwa hai."
-            ),
-            "trk": f"CASH KES {amount} logged. Ref {ref}. STK demo.",
-            "orm": f"Maallaqa KES {amount} galmeeffame. Ref {ref}. STK demo.",
-            "am": f"CASH KES {amount} logged. Ref {ref}. STK demo.",
+            "en": f"Cash KES {amount} logged. Ref {ref}. STK demo queued.",
+            "sw": f"Pesa KES {amount} imeandikwa. Ref {ref}. STK demo.",
+            "trk": f"Cash KES {amount}. Ref {ref}.",
+            "orm": f"Maallaqa KES {amount}. Ref {ref}.",
+            "am": f"Cash KES {amount}. Ref {ref}.",
         }
         return _clip(templates.get(lang) or templates["en"])
 
-    return _clip(str(facts))
-
-
-def localize_action(lang: str, kind: str, facts: dict[str, Any]) -> str:
-    """Rewrite action result in simple local language via Featherless; fallback if slow."""
-    fallback = _fallback_action(lang, kind, facts)
-    if lang == "en" or not featherless_ai.available():
-        return fallback
-
-    lang_name = LANG_NAMES.get(lang, lang)
-    system = (
-        f"You rewrite flood early-action phone messages for rural users into simple {lang_name}. "
-        "Use short everyday words. Max 2 short sentences. No markdown. Keep codes/numbers unchanged."
-    )
-    user = f"Kind: {kind}. Facts: {facts}. English draft: {fallback}"
-    text = featherless_ai.chat_text(system, user, timeout=USSD_LOCALE_TIMEOUT_S)
-    if not text:
-        return fallback
-    text = text.strip().strip('"')
-    if text.upper().startswith("END "):
-        text = text[4:]
-    return _clip(text)
+    return _clip(f"ALMA OK.")

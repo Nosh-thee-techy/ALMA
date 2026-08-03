@@ -21,7 +21,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from routes import dashboard, simulator, ussd, voice
+from routes import dashboard, simulator, twilio_webhook, ussd, voice
 from services import session_store
 
 
@@ -53,6 +53,7 @@ app.include_router(ussd.router)
 app.include_router(voice.router)
 app.include_router(simulator.router)
 app.include_router(dashboard.router)
+app.include_router(twilio_webhook.router)
 
 _audio = Path(__file__).resolve().parent / "data" / "audio"
 _audio.mkdir(parents=True, exist_ok=True)

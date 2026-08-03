@@ -5,19 +5,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, CloudRain, Dam } from "lucide-react";
 import { AppShell } from "@/components/turkana/AppShell";
 import { DeskCard, DeskCardHeader, DeskList, DeskListItem } from "@/components/turkana/DeskCard";
+import { LiveSourceBadge } from "@/components/turkana/LiveSourceBadge";
+import { VoiceHelpline } from "@/components/turkana/VoiceHelpline";
+import { WeatherHeatMap } from "@/components/turkana/WeatherHeatMap";
 import { Button } from "@/components/ui/button";
+import { useLiveBasin } from "@/hooks/use-live-basin";
 import { RequireAuth } from "@/lib/require-auth";
 import { lightMeta, tierToLight, worstLight, type TrafficLight } from "@/lib/status-light";
-import {
-  alerts,
-  compoundTrigger,
-  damTrigger,
-  gibeIIIMetrics,
-  rainfallTrigger,
-  tierMeta,
-  upstreamRainMetrics,
-  verificationMeta,
-} from "@/lib/turkana-data";
+import { tierMeta, verificationMeta } from "@/lib/turkana-data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/home")({
@@ -32,25 +27,35 @@ export const Route = createFileRoute("/home")({
 });
 
 function HomePage() {
+  const { data, loading, error, isLive } = useLiveBasin();
+  const { damTrigger, rainfallTrigger, compoundTrigger, dam, rain, alerts } = data;
+
   const damLight = tierToLight(damTrigger.tier);
   const rainLight = tierToLight(rainfallTrigger.tier);
   const overall = worstLight([damLight, rainLight, tierToLight(compoundTrigger.tier)]);
   const meta = lightMeta[overall];
 
   const openAlerts = alerts
-    .filter((a) => a.verification === "unconfirmed" || a.severity === "severe")
-    .slice(0, 3);
+    .filter((a) => a.verification === "unconfirmed" || a.severity === "severe" || a.id.startsWith("live-"))
+    .slice(0, 5);
 
   return (
     <AppShell>
-      <header className="mb-6">
-        <p className="text-sm font-bold text-primary">Operator home</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">What needs you right now?</h1>
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-primary">Operator home</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">What needs you right now?</h1>
+        </div>
+        <LiveSourceBadge isLive={isLive} loading={loading} error={error} />
       </header>
 
       <div className="space-y-5">
-        {/* Status card */}
-        <DeskCard className={cn("border-2", overall === "red" ? "border-risk-severe bg-risk-severe text-risk-severe-foreground" : meta.panel)}>
+        <DeskCard
+          className={cn(
+            "border-2",
+            overall === "red" ? "border-risk-severe bg-risk-severe text-risk-severe-foreground" : meta.panel,
+          )}
+        >
           <div className="flex flex-wrap items-center gap-3">
             <span className={cn("h-3.5 w-3.5 rounded-full ring-2 ring-white/50", meta.dot)} aria-hidden />
             <h2 className="text-xl font-bold tracking-tight sm:text-2xl">{meta.label}</h2>
@@ -61,7 +66,10 @@ function HomePage() {
               overall === "red" ? "text-risk-severe-foreground/95" : "opacity-95",
             )}
           >
-            {meta.meaning}
+            {compoundTrigger.detail || meta.meaning}
+          </p>
+          <p className={cn("mt-2 text-xs font-bold", overall === "red" ? "opacity-80" : "text-muted-foreground")}>
+            {data.pitchLine}
           </p>
 
           {overall === "red" && (
@@ -104,19 +112,18 @@ function HomePage() {
 
           {overall === "green" && (
             <p className="mt-4 text-sm opacity-90">
-              No urgent action. Open Dam or Rain below when you want the numbers.
+              No urgent action. Open Dam or Rain below when you want the live numbers.
             </p>
           )}
         </DeskCard>
 
-        {/* Dam + Rain summary cards */}
         <div className="grid gap-5 sm:grid-cols-2">
           <SummaryCard
             icon={<Dam className="h-5 w-5" aria-hidden />}
             title="Dam (Gibe III)"
             light={damLight}
-            line={`${gibeIIIMetrics.fillPercent}% full · release ${gibeIIIMetrics.releaseM3s} m³/s`}
-            plain={gibeIIIMetrics.plainSummary}
+            line={`Est. release ${dam.releaseM3s} m³/s · pressure index ${dam.fillPercent}`}
+            plain={dam.plainSummary}
             to="/dam"
             cta="Open dam details"
           />
@@ -124,18 +131,20 @@ function HomePage() {
             icon={<CloudRain className="h-5 w-5" aria-hidden />}
             title="Rain (upstream)"
             light={rainLight}
-            line={`${upstreamRainMetrics.rain24hMm} mm / 24h · soil ${upstreamRainMetrics.saturationPercent}%`}
-            plain={upstreamRainMetrics.plainSummary}
+            line={`${rain.rain24hMm} mm / 24h · soil ~${rain.saturationPercent}%`}
+            plain={rain.plainSummary}
             to="/rain"
             cta="Open rain details"
           />
         </div>
 
-        {/* Alerts card — style matches the reference screenshot */}
+        <WeatherHeatMap />
+        <VoiceHelpline />
+
         <DeskCard>
           <DeskCardHeader
-            title="Alerts to look at"
-            description="Unconfirmed or severe items first — full log on Alerts."
+            title="Live field actions & alerts"
+            description="USSD writes and risk checks from the engine — full log on Alerts."
             action={
               <Button asChild variant="outline" size="sm" className="rounded-full border-border/80 bg-dust font-bold">
                 <Link to="/alerts">All alerts</Link>
@@ -143,30 +152,38 @@ function HomePage() {
             }
           />
           <DeskList>
-            {openAlerts.map((a) => (
-              <DeskListItem key={a.id}>
-                <p className="font-bold leading-snug text-foreground">
-                  {a.message.slice(0, 110)}
-                  {a.message.length > 110 ? "…" : ""}
+            {openAlerts.length === 0 ? (
+              <DeskListItem>
+                <p className="text-sm text-muted-foreground">
+                  No USSD actions yet. Dial *384*96428# or wait for the next live risk poll.
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {a.timestamp} · {a.communities.join(", ")}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-bold", tierMeta[a.severity].badge)}>
-                    {tierMeta[a.severity].label}
-                  </span>
-                  <span
-                    className={cn(
-                      "rounded-full px-2.5 py-0.5 text-xs font-bold",
-                      verificationMeta[a.verification].badge,
-                    )}
-                  >
-                    {verificationMeta[a.verification].label}
-                  </span>
-                </div>
               </DeskListItem>
-            ))}
+            ) : (
+              openAlerts.map((a) => (
+                <DeskListItem key={a.id}>
+                  <p className="font-bold leading-snug text-foreground">
+                    {a.message.slice(0, 110)}
+                    {a.message.length > 110 ? "…" : ""}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {a.timestamp} · {a.communities.join(", ")}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-bold", tierMeta[a.severity].badge)}>
+                      {tierMeta[a.severity].label}
+                    </span>
+                    <span
+                      className={cn(
+                        "rounded-full px-2.5 py-0.5 text-xs font-bold",
+                        verificationMeta[a.verification].badge,
+                      )}
+                    >
+                      {verificationMeta[a.verification].label}
+                    </span>
+                  </div>
+                </DeskListItem>
+              ))
+            )}
           </DeskList>
         </DeskCard>
       </div>

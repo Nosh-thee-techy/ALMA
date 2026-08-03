@@ -1,10 +1,12 @@
-// AlertsTable: filterable log of past alerts.
+// AlertsTable: live USSD/engine actions (+ mock history only if engine offline).
 import { useMemo, useState } from "react";
 import { CloudRain, Dam, ShieldAlert } from "lucide-react";
+import { LiveSourceBadge } from "@/components/turkana/LiveSourceBadge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { alerts, tierMeta, verificationMeta, type RiskTier, type TriggerType } from "@/lib/turkana-data";
+import { useLiveBasin } from "@/hooks/use-live-basin";
+import { tierMeta, verificationMeta, type RiskTier, type TriggerType } from "@/lib/turkana-data";
 import { cn } from "@/lib/utils";
 
 const triggerIcon = { rain: CloudRain, dam: Dam, compound: ShieldAlert };
@@ -15,19 +17,20 @@ const triggerLabel: Record<TriggerType, string> = {
 };
 
 export function AlertsTable() {
+  const { data, loading, error, isLive } = useLiveBasin();
   const [severity, setSeverity] = useState<"all" | RiskTier>("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
   const filtered = useMemo(() => {
-    return alerts.filter((a) => {
+    return data.alerts.filter((a) => {
       if (severity !== "all" && a.severity !== severity) return false;
       const t = a.timestamp.slice(0, 10);
       if (from && t < from) return false;
       if (to && t > to) return false;
       return true;
     });
-  }, [severity, from, to]);
+  }, [data.alerts, severity, from, to]);
 
   return (
     <div className="rounded-lg border border-border bg-card">
@@ -35,9 +38,10 @@ export function AlertsTable() {
         <div className="flex-1 min-w-[200px]">
           <h2 className="text-base font-semibold">Alerts log</h2>
           <p className="text-xs text-muted-foreground">
-            All triggered notifications, dashboard + field channels.
+            Live USSD actions and field reports from the ALMA engine.
           </p>
         </div>
+        <LiveSourceBadge isLive={isLive} loading={loading} error={error} />
         <div>
           <label className="text-xs font-medium text-muted-foreground">From</label>
           <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 w-[150px]" />
@@ -54,6 +58,7 @@ export function AlertsTable() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All levels</SelectItem>
+              <SelectItem value="safe">Safe</SelectItem>
               <SelectItem value="watch">Watch</SelectItem>
               <SelectItem value="warning">Warning</SelectItem>
               <SelectItem value="severe">Severe</SelectItem>
@@ -92,7 +97,6 @@ export function AlertsTable() {
                     {a.severity}
                   </span>
                 </TableCell>
-                {/* Ground-truth feedback loop: field reports confirm or retract model estimates. */}
                 <TableCell>
                   <span
                     className={cn(
@@ -107,7 +111,10 @@ export function AlertsTable() {
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
                     {a.delivery.map((d) => (
-                      <span key={d} className="rounded border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-medium">
+                      <span
+                        key={d}
+                        className="rounded border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-medium"
+                      >
                         {d}
                       </span>
                     ))}
@@ -120,7 +127,7 @@ export function AlertsTable() {
           {filtered.length === 0 && (
             <TableRow>
               <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
-                No alerts match the current filters.
+                No alerts yet. Trigger a USSD action or wait for the next live poll.
               </TableCell>
             </TableRow>
           )}

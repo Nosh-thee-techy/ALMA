@@ -4,8 +4,8 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from services import africastalking, gemma_ai
-from services.playbook_loader import get_playbook_line
+from services import africastalking
+from services.alert_copy import simple_alert
 from services.risk_engine import compute_compound_risk
 
 router = APIRouter(tags=["simulator"])
@@ -18,7 +18,7 @@ class SimulatorTriggerIn(BaseModel):
     sector: str = "pastoralist"
     lang: str = "en"
     data_quality: str = "simulated"
-    channel: str = "sms"  # sms | whatsapp | both
+    channel: str = "whatsapp"  # sms | whatsapp | both
 
 
 @router.post("/api/simulator/trigger")
@@ -28,9 +28,8 @@ def simulator_trigger(body: SimulatorTriggerIn):
         body.dam_discharge_m3s,
         data_quality=body.data_quality if body.data_quality in ("simulated", "live_feed", "estimated") else "simulated",
     )
-    guidance = gemma_ai.translate_playbook(body.sector, risk.tier, body.lang)
-    static = get_playbook_line(body.sector, risk.tier, body.lang)
-    message = guidance.get("text") or static
+    # Short static copy only — no LLM rewrite (kept WhatsApp/SMS plain).
+    message = simple_alert(risk.tier, body.lang)
     channels = africastalking.dispatch(body.target_phone_number, message, body.channel)
 
     sms = channels.get("sms")
@@ -50,8 +49,7 @@ def simulator_trigger(body: SimulatorTriggerIn):
         "lang": body.lang,
         "channel": body.channel,
         "message": message,
-        "message_source": guidance.get("source"),
-        "static_playbook": static,
+        "message_source": "simple_alert",
         "sms": sms,
         "whatsapp": wa,
         "mode": mode,

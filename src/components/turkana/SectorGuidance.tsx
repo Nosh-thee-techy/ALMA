@@ -3,9 +3,10 @@
 // below gives a disaster manager every sector's action for every tier at once.
 import { useState } from "react";
 import { Sprout, Beef, Fish, HeartPulse, ShieldAlert } from "lucide-react";
+import { LiveSourceBadge } from "@/components/turkana/LiveSourceBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLiveBasin } from "@/hooks/use-live-basin";
 import {
-  compoundTrigger,
   guidanceTierLabel,
   sectorDetails,
   sectorMatrix,
@@ -25,15 +26,13 @@ const sectorIcons: Record<SectorId, typeof Sprout> = {
 const sectorOrder: SectorId[] = ["agriculture", "livestock", "fisheries", "health"];
 const tierOrder: GuidanceTier[] = ["safe", "watch", "warning", "severe", "compound"];
 
-// The active guidance tier comes from the same mock compound trigger the
-// dashboard uses. When both triggers overlap we surface the "compound" row.
-const activeTier: GuidanceTier = compoundTrigger.label.toLowerCase().includes("compound")
-  ? "compound"
-  : compoundTrigger.tier;
-
 export function SectorGuidance() {
+  const { data, loading, error, isLive } = useLiveBasin();
+  const compoundTrigger = data.compoundTrigger;
   const [sector, setSector] = useState<SectorId>("agriculture");
   const badge = tierMeta[compoundTrigger.tier].badge;
+  // Live compound window → matrix "compound" row; else use live tier.
+  const activeTier: GuidanceTier = data.risk?.compound_active ? "compound" : compoundTrigger.tier;
 
   return (
     <div className="space-y-6">
@@ -44,6 +43,7 @@ export function SectorGuidance() {
           <h2 className="text-base font-semibold">Sector guidance</h2>
           <p className="text-xs text-muted-foreground">{compoundTrigger.detail}</p>
         </div>
+        <LiveSourceBadge isLive={isLive} loading={loading} error={error} />
         <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", badge)}>
           Current tier · {guidanceTierLabel[activeTier]}
         </span>
@@ -83,7 +83,7 @@ export function SectorGuidance() {
                 </div>
 
                 <p className="mt-4 rounded-md border border-border bg-background p-3 text-sm font-medium leading-snug">
-                  {d.action}
+                  {sectorMatrix[activeTier][s]}
                 </p>
 
                 <ul className="mt-4 space-y-2 text-sm text-muted-foreground">

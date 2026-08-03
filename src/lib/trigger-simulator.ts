@@ -17,7 +17,15 @@ export type SimulatorTriggerResult = {
 };
 
 const engineBase = () =>
-  (process.env.ALMA_ENGINE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
+  (
+    (typeof import.meta !== "undefined" &&
+      (import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_ALMA_ENGINE_URL) ||
+    (typeof import.meta !== "undefined" &&
+      (import.meta as ImportMeta & { env?: Record<string, string> }).env?.ALMA_ENGINE_URL) ||
+    process.env.ALMA_ENGINE_URL ||
+    process.env.VITE_ALMA_ENGINE_URL ||
+    "http://127.0.0.1:8787"
+  ).replace(/\/$/, "");
 
 /** Map 0–100 dam slider (% fill delta) → approximate discharge m³/s for the risk engine. */
 export function damSliderToM3s(slider: number): number {
@@ -36,7 +44,7 @@ export const triggerSimulator = createServerFn({ method: "POST" })
     }) => data,
   )
   .handler(async ({ data }): Promise<SimulatorTriggerResult> => {
-    const channel = data.channel ?? "sms";
+    const channel = data.channel ?? "whatsapp";
     try {
       const res = await fetch(`${engineBase()}/api/simulator/trigger`, {
         method: "POST",

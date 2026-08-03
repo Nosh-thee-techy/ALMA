@@ -2,11 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { CloudRain } from "lucide-react";
 import { AppShell } from "@/components/turkana/AppShell";
 import { DeskCard, DeskCardHeader, DeskMetric } from "@/components/turkana/DeskCard";
+import { LiveSourceBadge } from "@/components/turkana/LiveSourceBadge";
 import { TrendChart } from "@/components/turkana/TrendChart";
 import { Button } from "@/components/ui/button";
+import { useLiveBasin } from "@/hooks/use-live-basin";
 import { RequireAuth } from "@/lib/require-auth";
 import { lightMeta, tierToLight } from "@/lib/status-light";
-import { rainfallTrigger, upstreamRainMetrics } from "@/lib/turkana-data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/rain")({
@@ -21,16 +22,19 @@ export const Route = createFileRoute("/rain")({
 });
 
 function RainPage() {
-  const rain = upstreamRainMetrics;
+  const { data, loading, error, isLive } = useLiveBasin();
+  const rain = data.rain;
+  const rainfallTrigger = data.rainfallTrigger;
   const light = tierToLight(rainfallTrigger.tier);
   const lm = lightMeta[light];
 
   return (
     <AppShell>
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Button asChild variant="ghost" size="sm" className="font-bold text-primary">
           <Link to="/home">← Back to home</Link>
         </Button>
+        <LiveSourceBadge isLive={isLive} loading={loading} error={error} />
       </div>
 
       <div className="space-y-5">
@@ -50,38 +54,37 @@ function RainPage() {
             </span>
           </div>
           <p className="mt-4 max-w-3xl text-base leading-relaxed">{rain.plainSummary}</p>
-          <p className="mt-2 text-xs font-bold text-muted-foreground">{rain.lastUpdatedLabel}</p>
+          <p className="mt-2 text-xs font-bold text-muted-foreground">
+            {rain.lastUpdatedLabel} · {rain.sourceLabel}
+          </p>
         </DeskCard>
 
         <DeskCard>
-          <DeskCardHeader
-            title="Current metrics"
-            description="Upstream rainfall picture in plain numbers."
-          />
+          <DeskCardHeader title="Live metrics" description="Open-Meteo precipitation over Upper Omo." />
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <DeskMetric label="Rain last 24 hours" value={`${rain.rain24hMm} mm`} note="Rain that fell above the dam" />
-            <DeskMetric label="Rain last 7 days" value={`${rain.rain7dMm} mm`} note="Recent wet spell" />
+            <DeskMetric label="Rain last 24 hours" value={`${rain.rain24hMm} mm`} note="Live Open-Meteo" />
+            <DeskMetric label="Rain last 7 days" value={`${rain.rain7dMm} mm`} note="Live sum" />
             <DeskMetric
-              label="Soil wetness"
+              label="Soil wetness (estimate)"
               value={`${rain.saturationPercent}%`}
-              note="Wet soil means new rain reaches the river faster"
+              note="Derived from 24h + 7d rain"
             />
             <DeskMetric
-              label="Rain risk (dam not included)"
+              label="Rain-only risk"
               value={rainfallTrigger.label}
-              note={`If only rain were driving floods: about ${rainfallTrigger.etaHours ?? "—"} hours`}
+              note={`Arrival ~${rainfallTrigger.etaHours ?? "—"} hours`}
             />
-            <DeskMetric label="Data source" value="Demo / Open-Meteo" note={rain.sourceLabel} />
+            <DeskMetric label="Data quality" value={rain.dataQuality} note={rain.sourceLabel} />
           </div>
         </DeskCard>
 
         <DeskCard>
           <DeskCardHeader
-            title="Last 7 days"
-            description="How rainfall climbed vs reservoir fill (reservoir line is simulated)."
+            title="Last 7 days (live)"
+            description="Daily Open-Meteo rain. Right axis is a pressure index, not SCADA fill %."
           />
           <div className="mt-4 overflow-hidden rounded-xl border border-border/70">
-            <TrendChart />
+            <TrendChart data={data.trend} live />
           </div>
         </DeskCard>
 
@@ -94,9 +97,8 @@ function RainPage() {
               <Link to="/dam" className="font-bold text-primary">
                 Dam page
               </Link>{" "}
-              — if Gibe III is also releasing, Home may turn red for Compound Risk.
+              — estimated release pressure updates from this same live rain.
             </li>
-            <li>Live CHIRPS API is not connected yet; numbers are demo estimates.</li>
           </ul>
         </DeskCard>
       </div>

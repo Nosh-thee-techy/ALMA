@@ -21,6 +21,22 @@ AT_WHATSAPP_URL = os.getenv(
 
 
 def send_sms(phone: str, message: str) -> dict[str, Any]:
+    sms_provider = os.getenv("SMS_PROVIDER", "auto").lower()
+    if sms_provider in ("auto", "twilio"):
+        from services import twilio_dispatch
+
+        if twilio_dispatch.sms_available():
+            return twilio_dispatch.send_sms(phone, message)
+        if sms_provider == "twilio":
+            return {
+                "mode": "demo",
+                "channel": "sms",
+                "provider": "twilio",
+                "to": phone,
+                "message": message,
+                "note": "SMS_PROVIDER=twilio but Twilio env incomplete",
+            }
+
     if not AT_API_KEY or not AT_USERNAME:
         return {
             "mode": "demo",
