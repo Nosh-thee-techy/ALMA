@@ -1,21 +1,24 @@
-// 3D weather heatmap — pick a ward to see rain change + flood timing.
-import { useMemo, useState } from "react";
+// Real 2D basin map (Leaflet + OSM) with colored flood/rain zones per ward.
+import { useEffect, useMemo, useRef, useState } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { LiveSourceBadge } from "@/components/turkana/LiveSourceBadge";
 import { useLiveBasin } from "@/hooks/use-live-basin";
 import { basinWards, weatherForWard, type AreaWeather, type BasinWard } from "@/lib/basin-geo";
 import { tierMeta, type RiskTier } from "@/lib/turkana-data";
 import { cn } from "@/lib/utils";
 
-const heatColor = (intensity: number) => {
-  // 0–1 → safe→severe ladder (hazard meaning only)
-  if (intensity < 0.25) return "var(--risk-safe)";
-  if (intensity < 0.45) return "var(--risk-watch)";
-  if (intensity < 0.7) return "var(--risk-warning)";
-  return "var(--risk-severe)";
+const TIER_FILL: Record<RiskTier, string> = {
+  safe: "#3d8f5a",
+  watch: "#c9a227",
+  warning: "#d97706",
+  severe: "#c2410c",
 };
 
-function intensityFor(w: AreaWeather, maxRain: number): number {
-  return Math.min(1, w.rain24hMm / Math.max(12, maxRain));
+function zoneRadiusKm(ward: BasinWard, rain24: number): number {
+  // Larger rain → slightly larger influence zone (km)
+  const base = ward.sector === "fisher" ? 14 : 18;
+  return base + Math.min(10, rain24 * 0.4);
 }
 
 export function WeatherHeatMap({
@@ -27,6 +30,9 @@ export function WeatherHeatMap({
 }) {
   const { data, loading, error, isLive } = useLiveBasin();
   const [selectedId, setSelectedId] = useState<string>("kalokol");
+  const mapEl = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const layerRef = useRef<L.LayerGroup | null>(null);
 
   const areas = useMemo(() => {
     const rain24 = Number(data.rain?.rain24hMm ?? data.risk?.rain_mm ?? 0);
@@ -50,7 +56,6 @@ export function WeatherHeatMap({
     );
   }, [data]);
 
-  const maxRain = Math.max(12, ...areas.map((a) => a.rain24hMm));
   const selected = areas.find((a) => a.wardId === selectedId) || areas[0];
   const selectedWard = basinWards.find((w) => w.wardId === selected.wardId)!;
 
@@ -61,122 +66,150 @@ export function WeatherHeatMap({
     if (weather && ward) onSelectWard?.(ward, weather);
   }
 
+  // Init map once
+  useEffect(() => {
+    if (!mapEl.current || mapRef.current) return;
+
+    const map = L.map(mapEl.current, {
+      zoomControl: true,
+      attributionControl: true,
+      scrollWheelZoom: true,
+    }).setView([4.1, 35.85], 8);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 16,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+
+    // Basin outline cue (rough Omo–Turkana corridor)
+    L.polyline(
+      [
+        [5.0, 36.15],
+        [4.8, 36.05],
+        [4.45, 35.95],
+        [3.95, 35.85],
+        [3.52, 35.75],
+        [3.35, 35.7],
+      ],
+      { color: "#0e7490", weight: 3, opacity: 0.55, dashArray: "6 8" },
+    ).addTo(map);
+
+    layerRef.current = L.layerGroup().addTo(map);
+    mapRef.current = map;
+
+    const t = window.setTimeout(() => map.invalidateSize(), 80);
+    return () => {
+      window.clearTimeout(t);
+      map.remove();
+      mapRef.current = null;
+      layerRef.current = null;
+    };
+  }, []);
+
+  // Draw / redraw color zones when weather or selection changes
+  useEffect(() => {
+    const map = mapRef.current;
+    const group = layerRef.current;
+    if (!map || !group) return;
+
+    group.clearLayers();
+
+    for (const area of areas) {
+      const ward = basinWards.find((w) => w.wardId === area.wardId)!;
+      const active = area.wardId === selectedId;
+      const fill = TIER_FILL[area.tier];
+      const radiusM = zoneRadiusKm(ward, area.rain24hMm) * 1000;
+
+      const circle = L.circle([ward.lat, ward.lon], {
+        radius: radiusM,
+        color: active ? "#0f766e" : fill,
+        weight: active ? 3 : 1.5,
+        fillColor: fill,
+        fillOpacity: active ? 0.45 : 0.28,
+      });
+
+      circle.bindTooltip(
+        `<strong>${area.name}</strong><br/>${area.tier} · ${area.rain24hMm} mm/24h`,
+        { sticky: true, className: "alma-map-tip" },
+      );
+      circle.on("click", () => pick(area.wardId));
+      circle.addTo(group);
+
+      const marker = L.circleMarker([ward.lat, ward.lon], {
+        radius: active ? 8 : 6,
+        color: "#fff",
+        weight: 2,
+        fillColor: fill,
+        fillOpacity: 1,
+      });
+      marker.bindTooltip(area.name, { direction: "top", offset: [0, -6] });
+      marker.on("click", () => pick(area.wardId));
+      marker.addTo(group);
+
+      L.marker([ward.lat, ward.lon], {
+        interactive: false,
+        icon: L.divIcon({
+          className: "alma-ward-label",
+          html: `<span>${area.name}</span>`,
+          iconSize: [90, 18],
+          iconAnchor: [45, -8],
+        }),
+      }).addTo(group);
+    }
+
+    if (selectedWard) {
+      map.panTo([selectedWard.lat, selectedWard.lon], { animate: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pick is stable enough via selectedId
+  }, [areas, selectedId]);
+
   return (
     <div className={cn("overflow-hidden rounded-xl border border-border bg-card", className)}>
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3 sm:px-5">
         <div>
-          <h2 className="text-sm font-bold">3D weather heat map</h2>
+          <h2 className="text-sm font-bold">Basin weather map</h2>
           <p className="text-xs text-muted-foreground">
-            Pick a ward — rain change and flood timing update for that place.
+            Real map · color zones show flood level. Tap a ward for rain change.
           </p>
         </div>
         <LiveSourceBadge isLive={isLive} loading={loading} error={error} />
       </div>
 
-      <div className="grid gap-0 lg:grid-cols-[1.4fr_1fr]">
-        {/* 3D stage */}
-        <div className="relative min-h-[280px] overflow-hidden bg-gradient-to-b from-secondary/50 to-dust px-4 py-8 sm:min-h-[340px]">
-          <div
-            className="relative mx-auto h-[220px] w-full max-w-xl sm:h-[260px]"
-            style={{ perspective: "900px" }}
-          >
-            <div
-              className="absolute inset-0 origin-center rounded-lg border border-border/80 bg-card/90 shadow-md"
-              style={{
-                transform: "rotateX(58deg) rotateZ(-18deg) translateY(12px)",
-                transformStyle: "preserve-3d",
-              }}
-            >
-              {/* Heat grid */}
-              <div className="absolute inset-0 grid grid-cols-8 grid-rows-6 gap-0.5 p-2 opacity-90">
-                {Array.from({ length: 48 }).map((_, i) => {
-                  const col = i % 8;
-                  const row = Math.floor(i / 8);
-                  // Sample nearest ward intensity for cell
-                  const u = (col + 0.5) / 8;
-                  const v = (row + 0.5) / 6;
-                  let best = areas[0];
-                  let bestD = 99;
-                  for (const a of areas) {
-                    const w = basinWards.find((x) => x.wardId === a.wardId)!;
-                    const d = (w.u - u) ** 2 + (w.v - v) ** 2;
-                    if (d < bestD) {
-                      bestD = d;
-                      best = a;
-                    }
-                  }
-                  const inten = intensityFor(best, maxRain) * (0.55 + (1 - bestD) * 0.9);
-                  return (
-                    <div
-                      key={i}
-                      className="rounded-[2px] transition-colors duration-700"
-                      style={{
-                        background: heatColor(Math.min(1, inten)),
-                        opacity: 0.35 + Math.min(1, inten) * 0.55,
-                      }}
-                    />
-                  );
-                })}
-              </div>
-
-              {/* River / lake cues */}
-              <svg className="pointer-events-none absolute inset-0 h-full w-full opacity-40" viewBox="0 0 100 100">
-                <path
-                  d="M18 8 Q 35 30 48 55 T 78 82"
-                  fill="none"
-                  stroke="oklch(0.45 0.1 220)"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                />
-                <ellipse cx="86" cy="86" rx="12" ry="8" fill="oklch(0.55 0.1 230)" />
-              </svg>
-
-              {/* Extruded ward columns */}
-              {areas.map((a) => {
-                const w = basinWards.find((x) => x.wardId === a.wardId)!;
-                const inten = intensityFor(a, maxRain);
-                const h = 18 + inten * 72;
-                const active = a.wardId === selectedId;
-                return (
-                  <button
-                    key={a.wardId}
-                    type="button"
-                    onClick={() => pick(a.wardId)}
-                    className="absolute -translate-x-1/2 -translate-y-full outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    style={{
-                      left: `${w.u * 100}%`,
-                      top: `${w.v * 100}%`,
-                      transform: `translate(-50%, -100%) rotateZ(18deg) rotateX(-58deg)`,
-                      height: h,
-                      width: active ? 18 : 14,
-                      zIndex: active ? 5 : 2,
-                    }}
-                    aria-pressed={active}
-                    aria-label={`${a.name}, rain ${a.rain24hMm} mm`}
-                  >
-                    <span
-                      className={cn(
-                        "block h-full w-full rounded-t-sm border border-white/40 shadow-sm transition-all duration-500",
-                        active && "ring-2 ring-primary ring-offset-1",
-                      )}
-                      style={{ background: heatColor(inten) }}
-                    />
-                    <span className="absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap text-[10px] font-bold text-foreground drop-shadow-sm">
-                      {a.name}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+      <div className="grid gap-0 lg:grid-cols-[1.45fr_1fr]">
+        <div className="relative min-h-[320px] sm:min-h-[400px]">
+          <div ref={mapEl} className="absolute inset-0 z-0 h-full w-full" />
+          <div className="pointer-events-none absolute bottom-3 left-3 z-[500] flex flex-wrap gap-2 rounded-md border border-border bg-card/95 px-2.5 py-1.5 text-[10px] shadow-sm">
+            {(["safe", "watch", "warning", "severe"] as const).map((t) => (
+              <span key={t} className="inline-flex items-center gap-1 capitalize">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: TIER_FILL[t] }} />
+                {tierMeta[t].label}
+              </span>
+            ))}
           </div>
-          <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            Column height = local 24h rain heat · tilt = basin view
-          </p>
         </div>
 
-        {/* Area weather breakdown */}
         <aside className="border-t border-border bg-background/50 p-4 sm:p-5 lg:border-l lg:border-t-0">
-          <p className="text-xs font-bold text-primary">{selectedWard.country} · {selectedWard.sector}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {basinWards.map((w) => (
+              <button
+                key={w.wardId}
+                type="button"
+                onClick={() => pick(w.wardId)}
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-xs font-bold transition-colors",
+                  w.wardId === selectedId
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-dust text-foreground hover:bg-secondary",
+                )}
+              >
+                {w.name}
+              </button>
+            ))}
+          </div>
+
+          <p className="mt-4 text-xs font-bold text-primary">
+            {selectedWard.country} · {selectedWard.sector}
+          </p>
           <h3 className="mt-1 text-xl font-bold tracking-tight">{selected.name}</h3>
           <span
             className={cn(
@@ -218,18 +251,19 @@ export function WeatherHeatMap({
 
           {selected.daily.length > 0 && (
             <div className="mt-4">
-              <p className="text-xs font-bold text-muted-foreground">7-day rain change</p>
-              <div className="mt-2 flex h-16 items-end gap-1">
+              <p className="text-xs font-bold text-muted-foreground">7-day rain</p>
+              <div className="mt-2 flex h-14 items-end gap-1">
                 {selected.daily.slice(-7).map((d) => {
                   const max = Math.max(1, ...selected.daily.map((x) => x.mm));
                   return (
                     <div key={d.day} className="flex flex-1 flex-col items-center gap-1">
                       <div
-                        className="w-full rounded-t-sm transition-all duration-500"
+                        className="w-full rounded-t-sm"
                         style={{
                           height: `${Math.max(8, (d.mm / max) * 100)}%`,
-                          background: heatColor(d.mm / Math.max(12, max)),
+                          background: TIER_FILL[selected.tier],
                           minHeight: 6,
+                          opacity: 0.75,
                         }}
                         title={`${d.day}: ${d.mm} mm`}
                       />
@@ -246,6 +280,28 @@ export function WeatherHeatMap({
           </p>
         </aside>
       </div>
+
+      <style>{`
+        .alma-ward-label {
+          background: transparent !important;
+          border: none !important;
+        }
+        .alma-ward-label span {
+          display: inline-block;
+          padding: 1px 6px;
+          border-radius: 999px;
+          background: color-mix(in oklab, var(--card) 92%, transparent);
+          border: 1px solid var(--border);
+          font-size: 10px;
+          font-weight: 700;
+          color: var(--foreground);
+          white-space: nowrap;
+        }
+        .leaflet-container {
+          font: inherit;
+          background: var(--dust);
+        }
+      `}</style>
     </div>
   );
 }

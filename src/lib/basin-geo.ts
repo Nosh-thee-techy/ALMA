@@ -1,5 +1,5 @@
 /**
- * Basin ward geography for the 3D weather heatmap (from engine wards_geojson).
+ * Basin ward geography for the weather zone map (from engine wards_geojson).
  */
 import type { RiskTier } from "@/lib/turkana-data";
 
