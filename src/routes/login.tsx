@@ -56,15 +56,13 @@ function LoginPage() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="org">Organization</Label>
-            <Input
-              id="org"
-              required
-              value={orgName}
-              onChange={(e) => setOrgName(e.target.value)}
-            />
+            <Input id="org" required value={orgName} onChange={(e) => setOrgName(e.target.value)} />
           </div>
           {error && <p className="text-sm font-bold text-risk-severe">{error}</p>}
-          <Button type="submit" className="w-full bg-act font-bold text-act-foreground hover:bg-act/90">
+          <Button
+            type="submit"
+            className="w-full bg-act font-bold text-act-foreground hover:bg-act/90"
+          >
             Sign in
           </Button>
         </form>

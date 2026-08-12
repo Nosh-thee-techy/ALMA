@@ -34,17 +34,19 @@ function SignUpPage() {
         </div>
 
         <p className="mt-4 rounded-lg bg-dust px-3 py-2 text-sm text-foreground">
-          Farmers do not sign up here. They use SMS/USSD (<strong>*384*96428#</strong>). This signup is
-          for organizations that operate the early-action desk.
+          Farmers do not sign up here. They use SMS/USSD (<strong>*384*96428#</strong>). This signup
+          is for organizations that operate the early-action desk.
         </p>
 
         <div className="mt-3 rounded-lg border border-border bg-card px-3 py-2 text-xs leading-relaxed text-muted-foreground">
           <p className="font-bold text-foreground">Where does this info go?</p>
           <p className="mt-1">
-            Right now: only into <strong className="text-foreground">this browser’s local storage</strong>{" "}
-            (keys <code className="rounded bg-dust px-1">alma.session.v1</code> and{" "}
+            Right now: only into{" "}
+            <strong className="text-foreground">this browser’s local storage</strong> (keys{" "}
+            <code className="rounded bg-dust px-1">alma.session.v1</code> and{" "}
             <code className="rounded bg-dust px-1">alma.org-registry.v1</code>). It is{" "}
-            <strong className="text-foreground">not</strong> sent to a server, email, or database yet.
+            <strong className="text-foreground">not</strong> sent to a server, email, or database
+            yet.
           </p>
           <p className="mt-1">
             Production would store org accounts in a real auth backend (invite + SSO).
@@ -109,7 +111,10 @@ function SignUpPage() {
             ))}
           </fieldset>
 
-          <Button type="submit" className="w-full bg-act font-bold text-act-foreground hover:bg-act/90">
+          <Button
+            type="submit"
+            className="w-full bg-act font-bold text-act-foreground hover:bg-act/90"
+          >
             Create workspace
           </Button>
         </form>

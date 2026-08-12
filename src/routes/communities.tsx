@@ -15,7 +15,8 @@ export const Route = createFileRoute("/communities")({
           <p className="text-sm font-bold text-primary">Communities</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">Who is downstream</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Color zones on the real map show flood level by ward — then the community list for population and ETA.
+            Color zones on the real map show flood level by ward — then the community list for
+            population and ETA.
           </p>
         </header>
         <div className="space-y-5">

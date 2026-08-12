@@ -8,6 +8,7 @@ export type TriggerType = "rain" | "dam" | "compound";
 // Ground-truth verification state of a dispatched alert. This closes the
 // two-way loop: field reports feed back and adjust system confidence.
 export type VerificationState = "unconfirmed" | "confirmed" | "false-alarm";
+export type LastReachedVia = "SMS" | "USSD" | "Voice" | "Unreached";
 
 export interface TriggerStatus {
   tier: RiskTier;
@@ -30,6 +31,7 @@ export interface Community {
   damEtaHours: number;
   tier: RiskTier;
   lastAlert: string;
+  lastReachedVia?: LastReachedVia;
   // Position on our schematic map (0-100 % of viewbox)
   x: number;
   y: number;
@@ -100,7 +102,8 @@ export const gibeIIIMetrics: DamMetrics = {
   releaseM3s: 420,
   spillwayStatus: "partial",
   turbineStatus: "Normal generation",
-  lastUpdatedLabel: "Demo dam numbers — not a live Gibe III feed (see Dam page for live alternatives)",
+  lastUpdatedLabel:
+    "Demo dam numbers — not a live Gibe III feed (see Dam page for live alternatives)",
   dataQuality: "simulated",
   plainSummary:
     "The dam lake is nearly full and some water is already being let out on purpose. This is the dam picture alone — not yet a flood alert by itself.",
@@ -385,10 +388,7 @@ export function tierFromMetric(v: number): RiskTier {
 // ---------------------------------------------------------------------------
 // Verification metadata — display label + color coding for the alerts log.
 // ---------------------------------------------------------------------------
-export const verificationMeta: Record<
-  VerificationState,
-  { label: string; badge: string }
-> = {
+export const verificationMeta: Record<VerificationState, { label: string; badge: string }> = {
   unconfirmed: {
     label: "Unconfirmed (model estimate)",
     badge: "bg-muted text-muted-foreground border border-border",
@@ -461,8 +461,7 @@ export const sectorDetails: Record<SectorId, SectorDetail> = {
     id: "agriculture",
     label: "Agriculture",
     headline: "Harvest window closing",
-    action:
-      "Harvest mature crops within 36h. Clear drainage channels near Omorate and Kalam.",
+    action: "Harvest mature crops within 36h. Clear drainage channels near Omorate and Kalam.",
     bullets: [
       "Prioritise sorghum and maize plots on the Omo floodplain terraces.",
       "Move stored grain above the 5m waterline or to raised granaries.",
@@ -485,8 +484,7 @@ export const sectorDetails: Record<SectorId, SectorDetail> = {
     id: "fisheries",
     label: "Fisheries",
     headline: "Surge arriving at Lake Delta",
-    action:
-      "Upstream surge arriving at Lake Delta in 18h. Anchor boats above the 5m waterline.",
+    action: "Upstream surge arriving at Lake Delta in 18h. Anchor boats above the 5m waterline.",
     bullets: [
       "Suspend night fishing across the delta and northern shoreline.",
       "Secure nets and outboard engines at Kalokol and Eliye Springs landings.",

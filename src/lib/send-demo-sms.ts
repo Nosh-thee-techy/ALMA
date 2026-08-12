@@ -3,9 +3,7 @@
 // when AT_API_KEY / AT_USERNAME are not configured yet.
 import { createServerFn } from "@tanstack/react-start";
 
-export type SendDemoSmsResult =
-  | { mode: "demo" }
-  | { mode: "live"; status: number };
+export type SendDemoSmsResult = { mode: "demo" } | { mode: "live"; status: number };
 
 export const sendDemoSms = createServerFn({ method: "POST" })
   .inputValidator((data: { phone: string; message: string }) => data)

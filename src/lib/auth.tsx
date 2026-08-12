@@ -72,7 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const next = { ...input, signedInAt: new Date().toISOString() };
     persist(next);
     // Keep a local registry so signup is inspectable in this browser (no server yet).
-    const registry = readRegistry().filter((r) => r.email.toLowerCase() !== next.email.toLowerCase());
+    const registry = readRegistry().filter(
+      (r) => r.email.toLowerCase() !== next.email.toLowerCase(),
+    );
     writeRegistry([next, ...registry]);
   };
 
@@ -89,7 +91,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const existing = readSession();
     if (existing && existing.email.toLowerCase() === email.toLowerCase()) {
-      persist({ ...existing, orgName: orgName || existing.orgName, signedInAt: new Date().toISOString() });
+      persist({
+        ...existing,
+        orgName: orgName || existing.orgName,
+        signedInAt: new Date().toISOString(),
+      });
       return true;
     }
     if (email && orgName) {

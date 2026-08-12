@@ -35,7 +35,8 @@ export const lightMeta: Record<
   },
   red: {
     label: "Red — Act now",
-    meaning: "Rain and dam danger are both high — do the actions below before opening detailed numbers.",
+    meaning:
+      "Rain and dam danger are both high — do the actions below before opening detailed numbers.",
     panel: "border-risk-severe bg-risk-severe text-risk-severe-foreground",
     badge: "bg-white/20 text-risk-severe-foreground",
     dot: "bg-risk-severe",

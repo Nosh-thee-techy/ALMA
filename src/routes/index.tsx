@@ -61,7 +61,11 @@ function LandingPage() {
         </p>
 
         <div className="mt-8 flex flex-wrap gap-3">
-          <Button asChild size="lg" className="bg-act font-bold text-act-foreground hover:bg-act/90">
+          <Button
+            asChild
+            size="lg"
+            className="bg-act font-bold text-act-foreground hover:bg-act/90"
+          >
             <Link to="/signup">Create your org workspace</Link>
           </Button>
           <Button asChild size="lg" variant="outline" className="font-bold">
@@ -96,8 +100,9 @@ function LandingPage() {
         <div className="mt-10 rounded-2xl bg-dust px-5 py-4 text-sm">
           <p className="font-bold">Farmers and fishers do not use this website.</p>
           <p className="mt-1 text-muted-foreground">
-            Last-mile guidance is on feature phones via USSD <strong className="text-foreground">*384*96428#</strong>{" "}
-            and SMS. This site is the operator desk only.
+            Last-mile guidance is on feature phones via USSD{" "}
+            <strong className="text-foreground">*384*96428#</strong> and SMS. This site is the
+            operator desk only.
           </p>
         </div>
       </main>

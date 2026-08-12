@@ -89,8 +89,7 @@ export const triggerSimulator = createServerFn({ method: "POST" })
         channel: json.channel || channel,
       };
     } catch {
-      const fallbackMessage =
-        `ALMA demo alert: rain ${data.rain_mm}mm, dam ~${data.dam_discharge_m3s} m3/s (simulated). Dial *384*96428#.`;
+      const fallbackMessage = `ALMA demo alert: rain ${data.rain_mm}mm, dam ~${data.dam_discharge_m3s} m3/s (simulated). Dial *384*96428#.`;
       if (channel === "whatsapp") {
         return {
           ok: true,
