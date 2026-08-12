@@ -1,0 +1,20 @@
+# ALMA Engine on Railway — persistent host for AT Voice / SMS / USSD callbacks.
+#
+# Redeploy checklist (sandbox key change or callback URL drift):
+#   1. Railway → service → Variables: update AT_API_KEY / AT_USERNAME / AT_VOICE_NUMBER
+#   2. Confirm PUBLIC_BASE_URL matches this service's public HTTPS URL (no trailing slash)
+#   3. Deploy → check GET /health
+#   4. Africa's Talking dashboard: USSD + Voice callback URLs → ${PUBLIC_BASE_URL}/api/ussd|voice
+#   5. Smoke-test USSD (*384*51567#) before live Voice judging
+#
+# Volume: mount a Railway volume at /data so ALMA_SESSION_DB survives restarts.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

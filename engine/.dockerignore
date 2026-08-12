@@ -1,0 +1,12 @@
+# Keep image small — only ship the FastAPI engine runtime.
+__pycache__
+*.pyc
+.venv
+venv
+.env
+data/audio/*
+!data/audio/.gitkeep
+data/*.sqlite3
+*.sqlite3
+.pytest_cache
+.mypy_cache
