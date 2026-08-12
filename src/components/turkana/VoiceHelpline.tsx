@@ -1,5 +1,5 @@
 // Voice agent — quick spoken risk breakdown + farmer helpline controls.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Headphones, Loader2, PhoneCall, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,13 @@ type Brief = {
   rain_mm?: number;
 };
 
+type TtsHealth = {
+  ok?: boolean;
+  voice_ready?: boolean;
+  elevenlabs?: { ok?: boolean; mode?: string; note?: string | null };
+  featherless?: { configured?: boolean; model?: string };
+};
+
 export function VoiceHelpline({
   wardId = "kalokol",
   className,
@@ -30,6 +37,20 @@ export function VoiceHelpline({
   const [brief, setBrief] = useState<Brief | null>(null);
   const [loading, setLoading] = useState(false);
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
+  const [ttsHealth, setTtsHealth] = useState<TtsHealth | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${engineBaseUrl()}/api/dashboard/tts-health`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (!cancelled && json) setTtsHealth(json as TtsHealth);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function speakBreakdown() {
     setLoading(true);
@@ -74,8 +95,34 @@ export function VoiceHelpline({
           <div>
             <h2 className="text-sm font-bold">Voice agent helpline</h2>
             <p className="text-xs text-muted-foreground">
-              Breaks risk into a short spoken brief for officers — and the same script powers the farmer phone menu.
+              Breaks risk into a short spoken brief for officers — and the same script powers the
+              farmer phone menu.
             </p>
+            {ttsHealth && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-bold",
+                    ttsHealth.elevenlabs?.ok
+                      ? "bg-risk-safe-bg text-risk-safe-foreground"
+                      : "bg-risk-watch-bg text-risk-watch-foreground",
+                  )}
+                  title={ttsHealth.elevenlabs?.note || undefined}
+                >
+                  ElevenLabs {ttsHealth.elevenlabs?.ok ? "live" : ttsHealth.elevenlabs?.mode || "off"}
+                </span>
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-bold",
+                    ttsHealth.featherless?.configured
+                      ? "bg-secondary text-secondary-foreground"
+                      : "bg-muted text-muted-foreground",
+                  )}
+                >
+                  Featherless {ttsHealth.featherless?.configured ? "ready" : "off"}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -120,7 +167,11 @@ export function VoiceHelpline({
             onClick={speakBreakdown}
             disabled={loading}
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Volume2 className="h-4 w-4" />}
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Volume2 className="h-4 w-4" />
+            )}
             {loading ? "Preparing brief…" : "Play quick breakdown"}
           </Button>
           {brief?.text && (
@@ -145,7 +196,8 @@ export function VoiceHelpline({
           </div>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             Feature phones call the Africa&apos;s Talking voice number (callback{" "}
-            <code className="text-foreground">/api/voice</code>). Same agent answers in plain language.
+            <code className="text-foreground">/api/voice</code>). Same agent answers in plain
+            language.
           </p>
           <ol className="mt-3 space-y-1.5 text-sm">
             <li>

@@ -27,8 +27,8 @@ function HelplinePage() {
           Hear the risk in plain words
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Pick a ward on the map, then play the voice agent breakdown. Farmers without data use the phone menu
-          or USSD <strong className="text-foreground">*384*96428#</strong>.
+          Pick a ward on the map, then play the voice agent breakdown. Farmers without data use the
+          phone menu or USSD <strong className="text-foreground">*384*96428#</strong>.
         </p>
       </header>
       <div className="space-y-5">
