@@ -18,7 +18,9 @@ export function TrendChart({ data, live = false }: { data?: TrendPoint[]; live?:
   return (
     <div className="bg-card">
       <div className="border-b border-border px-5 py-3">
-        <p className="text-sm font-bold">{live ? "Live rain vs pressure index" : "Rain vs reservoir fill"}</p>
+        <p className="text-sm font-bold">
+          {live ? "Live rain vs pressure index" : "Rain vs reservoir fill"}
+        </p>
         <p className="text-xs text-muted-foreground">
           Left axis: rainfall mm/day · Right axis:{" "}
           {live ? "estimated pressure index (not Gibe SCADA %)" : "Gibe III fill % (simulated)"}
@@ -47,7 +49,12 @@ export function TrendChart({ data, live = false }: { data?: TrendPoint[]; live?:
               stroke="var(--muted-foreground)"
               fontSize={12}
               domain={[40, 100]}
-              label={{ value: live ? "idx" : "%", position: "insideTopRight", offset: 0, fontSize: 11 }}
+              label={{
+                value: live ? "idx" : "%",
+                position: "insideTopRight",
+                offset: 0,
+                fontSize: 11,
+              }}
             />
             <Tooltip
               contentStyle={{

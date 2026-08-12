@@ -106,7 +106,8 @@ export function SimulatorPanel() {
           <div>
             <h2 className="text-base font-semibold">Practice warning: rain + dam together</h2>
             <p className="text-xs text-muted-foreground">
-              Sliders seed from live Open-Meteo risk when the engine is up. Adjust to rehearse SMS / WhatsApp.
+              Sliders seed from live Open-Meteo risk when the engine is up. Adjust to rehearse SMS /
+              WhatsApp.
             </p>
           </div>
           <LiveSourceBadge isLive={isLive} loading={loading} error={error} />
@@ -170,8 +171,8 @@ export function SimulatorPanel() {
 
         {ran && (
           <div className="mt-4 rounded-md border border-border bg-background/60 p-3 text-xs text-muted-foreground">
-            Simulation ready. In a real event this would send SMS, WhatsApp, and phone-menu
-            alerts to communities at this danger level.
+            Simulation ready. In a real event this would send SMS, WhatsApp, and phone-menu alerts
+            to communities at this danger level.
           </div>
         )}
 
@@ -208,9 +209,16 @@ export function SimulatorPanel() {
             onChange={(e) => setPhone(e.target.value)}
             className="h-9"
           />
-          <Button onClick={sendDemoSms} disabled={sending} variant="secondary" className="w-full gap-2">
+          <Button
+            onClick={sendDemoSms}
+            disabled={sending}
+            variant="secondary"
+            className="w-full gap-2"
+          >
             <Send className="h-4 w-4" />
-            {sending ? "Sending…" : `Send demo ${channel === "both" ? "SMS + WhatsApp" : channel.toUpperCase()}`}
+            {sending
+              ? "Sending…"
+              : `Send demo ${channel === "both" ? "SMS + WhatsApp" : channel.toUpperCase()}`}
           </Button>
           <p className="text-[11px] text-muted-foreground">
             Uses the ALMA engine on port 8787. WhatsApp sends via Twilio sandbox (join the sandbox
@@ -244,7 +252,12 @@ function SliderRow({
           <Icon className="h-4 w-4 text-muted-foreground" />
           {label}
         </div>
-        <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold capitalize", tierMeta[tier].badge)}>
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-xs font-semibold capitalize",
+            tierMeta[tier].badge,
+          )}
+        >
           {tier} · {value}
         </span>
       </div>
@@ -256,9 +269,20 @@ function SliderRow({
 
 function TierChip({ label, tier, big = false }: { label: string; tier: RiskTier; big?: boolean }) {
   return (
-    <div className={cn("rounded-md border border-border bg-background p-2", big && "ring-2 ring-primary/20")}>
+    <div
+      className={cn(
+        "rounded-md border border-border bg-background p-2",
+        big && "ring-2 ring-primary/20",
+      )}
+    >
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className={cn("mt-1 rounded px-2 py-1 font-semibold capitalize", tierMeta[tier].badge, big && "text-sm")}>
+      <div
+        className={cn(
+          "mt-1 rounded px-2 py-1 font-semibold capitalize",
+          tierMeta[tier].badge,
+          big && "text-sm",
+        )}
+      >
         {tierMeta[tier].label}
       </div>
     </div>
@@ -268,7 +292,9 @@ function TierChip({ label, tier, big = false }: { label: string; tier: RiskTier;
 function MsgBlock({ lang, text }: { lang: string; text: string }) {
   return (
     <div className="rounded-md border border-border bg-background p-3">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{lang}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {lang}
+      </div>
       <div className="mt-1 text-sm leading-snug">{text}</div>
     </div>
   );

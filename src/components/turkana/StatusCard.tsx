@@ -137,7 +137,12 @@ export function StatusCard({
         </span>
       </div>
 
-      <p className={cn("mt-3 text-sm", severeCompound ? "text-risk-severe-foreground/90" : "text-muted-foreground")}>
+      <p
+        className={cn(
+          "mt-3 text-sm",
+          severeCompound ? "text-risk-severe-foreground/90" : "text-muted-foreground",
+        )}
+      >
         {status.detail}
       </p>
 
@@ -149,7 +154,11 @@ export function StatusCard({
           severeCompound ? "border-white/20" : "border-border",
         )}
       >
-        <span className={cn(severeCompound ? "text-risk-severe-foreground/80" : "text-muted-foreground")}>
+        <span
+          className={cn(
+            severeCompound ? "text-risk-severe-foreground/80" : "text-muted-foreground",
+          )}
+        >
           Est. arrival
         </span>
         <span className="text-lg font-bold tabular-nums">
@@ -177,7 +186,10 @@ export function StatusCard({
             asChild
             size="sm"
             variant="outline"
-            className={cn(severeCompound && "border-white/40 bg-transparent text-risk-severe-foreground hover:bg-white/10")}
+            className={cn(
+              severeCompound &&
+                "border-white/40 bg-transparent text-risk-severe-foreground hover:bg-white/10",
+            )}
           >
             <Link to="/simulator">Fan-out in Simulator</Link>
           </Button>
@@ -185,7 +197,10 @@ export function StatusCard({
             asChild
             size="sm"
             variant="outline"
-            className={cn(severeCompound && "border-white/40 bg-transparent text-risk-severe-foreground hover:bg-white/10")}
+            className={cn(
+              severeCompound &&
+                "border-white/40 bg-transparent text-risk-severe-foreground hover:bg-white/10",
+            )}
           >
             <Link to="/alerts">Verify in Alerts</Link>
           </Button>

@@ -13,13 +13,7 @@ const tierColor: Record<Community["tier"], string> = {
   severe: "var(--risk-severe)",
 };
 
-export function RiskMap({
-  communities,
-  region,
-}: {
-  communities: Community[];
-  region: Region;
-}) {
+export function RiskMap({ communities, region }: { communities: Community[]; region: Region }) {
   const labelId = useId();
   const [selected, setSelected] = useState<Community | null>(null);
   const visible = communities.filter((c) =>
@@ -31,7 +25,9 @@ export function RiskMap({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
         <div>
           <h3 className="text-sm font-bold">Basin map (schematic)</h3>
-          <p className="text-xs text-muted-foreground">Gibe III → Omo River → Lake Turkana · not a GPS map</p>
+          <p className="text-xs text-muted-foreground">
+            Gibe III → Omo River → Lake Turkana · not a GPS map
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex flex-wrap gap-3 text-xs">
@@ -139,9 +135,27 @@ export function RiskMap({
                   strokeWidth={isSelected ? "0.6" : "0.4"}
                 />
                 {c.tier === "severe" && (
-                  <circle r="3" fill="none" stroke={tierColor[c.tier]} strokeWidth="0.3" opacity="0.5">
-                    <animate attributeName="r" from="1.8" to="4" dur="1.6s" repeatCount="indefinite" />
-                    <animate attributeName="opacity" from="0.6" to="0" dur="1.6s" repeatCount="indefinite" />
+                  <circle
+                    r="3"
+                    fill="none"
+                    stroke={tierColor[c.tier]}
+                    strokeWidth="0.3"
+                    opacity="0.5"
+                  >
+                    <animate
+                      attributeName="r"
+                      from="1.8"
+                      to="4"
+                      dur="1.6s"
+                      repeatCount="indefinite"
+                    />
+                    <animate
+                      attributeName="opacity"
+                      from="0.6"
+                      to="0"
+                      dur="1.6s"
+                      repeatCount="indefinite"
+                    />
                   </circle>
                 )}
                 <text x="2.5" y="1" fontSize="2" fill="oklch(0.2 0.03 240)" fontWeight="500">
@@ -170,7 +184,12 @@ export function RiskMap({
               Rain ETA {selected.rainEtaHours}h · Dam ETA {selected.damEtaHours}h
             </div>
             <div className="mt-2 flex items-center justify-between gap-2">
-              <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", tierMeta[selected.tier].badge)}>
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                  tierMeta[selected.tier].badge,
+                )}
+              >
                 {tierMeta[selected.tier].label}
               </span>
               <Link

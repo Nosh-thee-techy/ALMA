@@ -52,10 +52,17 @@ export function CommunityList() {
                         {c.population.toLocaleString()} people · {c.distanceFromDamKm} km from dam
                       </div>
                     </div>
-                    <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize", meta.badge)}>
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize",
+                        meta.badge,
+                      )}
+                    >
                       {c.tier}
                     </span>
-                    <span className="hidden text-xs text-muted-foreground sm:inline">last: {c.lastAlert}</span>
+                    <span className="hidden text-xs text-muted-foreground sm:inline">
+                      last: {c.lastAlert}
+                    </span>
                   </button>
                 </li>
               );
@@ -68,7 +75,9 @@ export function CommunityList() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-base font-semibold">{selected.name}</h3>
-                <p className="text-xs text-muted-foreground">{selected.region} · Lake Turkana area</p>
+                <p className="text-xs text-muted-foreground">
+                  {selected.region} · Lake Turkana area
+                </p>
               </div>
               <span
                 className={cn(
@@ -84,8 +93,16 @@ export function CommunityList() {
             <div className="grid grid-cols-2 gap-3">
               <Stat icon={Users} label="Population" value={selected.population.toLocaleString()} />
               <Stat icon={Radio} label="Last alert" value={selected.lastAlert} />
-              <Stat icon={MapPin} label="From Gibe III" value={`${selected.distanceFromDamKm} km`} />
-              <Stat icon={MapPin} label="From rain area" value={`${selected.distanceFromCatchmentKm} km`} />
+              <Stat
+                icon={MapPin}
+                label="From Gibe III"
+                value={`${selected.distanceFromDamKm} km`}
+              />
+              <Stat
+                icon={MapPin}
+                label="From rain area"
+                value={`${selected.distanceFromCatchmentKm} km`}
+              />
             </div>
 
             <div className="rounded-md border border-border bg-secondary/40 p-4">
@@ -93,8 +110,16 @@ export function CommunityList() {
                 <Clock className="h-4 w-4" /> How soon floodwater may arrive (live)
               </div>
               <div className="space-y-2 text-sm">
-                <PropRow label="From heavy rain" value={`${selected.rainEtaHours} hours`} tone="warning" />
-                <PropRow label="From dam release" value={`${selected.damEtaHours} hours`} tone="watch" />
+                <PropRow
+                  label="From heavy rain"
+                  value={`${selected.rainEtaHours} hours`}
+                  tone="warning"
+                />
+                <PropRow
+                  label="From dam release"
+                  value={`${selected.damEtaHours} hours`}
+                  tone="watch"
+                />
                 <PropRow
                   label="When both arrive together"
                   value={`${Math.min(selected.rainEtaHours, selected.damEtaHours)}–${Math.max(selected.rainEtaHours, selected.damEtaHours)}h`}

@@ -3,8 +3,21 @@ import { useMemo, useState } from "react";
 import { CloudRain, Dam, ShieldAlert } from "lucide-react";
 import { LiveSourceBadge } from "@/components/turkana/LiveSourceBadge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useLiveBasin } from "@/hooks/use-live-basin";
 import { tierMeta, verificationMeta, type RiskTier, type TriggerType } from "@/lib/turkana-data";
 import { cn } from "@/lib/utils";
@@ -44,11 +57,21 @@ export function AlertsTable() {
         <LiveSourceBadge isLive={isLive} loading={loading} error={error} />
         <div>
           <label className="text-xs font-medium text-muted-foreground">From</label>
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 w-[150px]" />
+          <Input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="h-9 w-[150px]"
+          />
         </div>
         <div>
           <label className="text-xs font-medium text-muted-foreground">To</label>
-          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 w-[150px]" />
+          <Input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="h-9 w-[150px]"
+          />
         </div>
         <div>
           <label className="text-xs font-medium text-muted-foreground">Severity</label>
@@ -93,7 +116,12 @@ export function AlertsTable() {
                   </span>
                 </TableCell>
                 <TableCell>
-                  <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-semibold capitalize", meta.badge)}>
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full px-2 py-0.5 text-xs font-semibold capitalize",
+                      meta.badge,
+                    )}
+                  >
                     {a.severity}
                   </span>
                 </TableCell>
@@ -120,7 +148,9 @@ export function AlertsTable() {
                     ))}
                   </div>
                 </TableCell>
-                <TableCell className="max-w-[280px] text-xs text-muted-foreground">{a.message}</TableCell>
+                <TableCell className="max-w-[280px] text-xs text-muted-foreground">
+                  {a.message}
+                </TableCell>
               </TableRow>
             );
           })}
