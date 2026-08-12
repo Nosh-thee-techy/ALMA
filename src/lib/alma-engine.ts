@@ -7,6 +7,7 @@ import {
   type AlertRecord,
   type Community,
   type DamMetrics,
+  type LastReachedVia,
   type RainMetrics,
   type RiskTier,
   type TrendPoint,
@@ -22,7 +23,10 @@ export function engineBaseUrl(): string {
     (typeof import.meta !== "undefined" &&
       (import.meta as ImportMeta & { env?: Record<string, string> }).env?.ALMA_ENGINE_URL);
   const fromProcess =
-    typeof process !== "undefined" ? process.env?.ALMA_ENGINE_URL || process.env?.VITE_ALMA_ENGINE_URL : undefined;
+    typeof process !== "undefined"
+      ? process.env?.ALMA_ENGINE_URL || process.env?.VITE_ALMA_ENGINE_URL
+      : undefined;
+
   return (fromVite || fromProcess || "http://127.0.0.1:8787").replace(/\/$/, "");
 }
 
@@ -38,7 +42,35 @@ export type LiveRisk = {
   compound_severity: number;
   tier: RiskTier;
   data_quality: string;
+  ml_flood_probability?: number | null;
+
+  ml_model_mode?: string | null;
+
+  ml_honesty?: string | null;
+
   plain_summary: string;
+};
+
+export type RiskOutlook = "Rising" | "Stable" | "Falling";
+
+export type CatchmentForecast = {
+  id?: string;
+
+  label?: string;
+
+  rain_24h_mm?: number;
+
+  rain_7d_mm?: number;
+
+  forecast_rainfall?: { next3_day?: number; next7_day?: number };
+
+  soil_moisture?: { current?: number; trend?: "rising" | "falling" | "stable" };
+
+  risk_outlook?: RiskOutlook;
+
+  honesty?: string;
+
+  error?: string;
 };
 
 export type LiveSignalsResponse = {
@@ -52,7 +84,32 @@ export type LiveSignalsResponse = {
     label?: string;
     source?: string;
     error?: string;
+    forecast_rainfall?: { next3_day?: number; next7_day?: number };
+
+    soil_moisture?: { current?: number; trend?: string };
+
+    risk_outlook?: RiskOutlook;
   };
+
+  catchments?: {
+    dam_upstream?: CatchmentForecast;
+
+    downstream?: CatchmentForecast;
+  };
+
+  risk_outlook?: {
+    downstream_flood?: RiskOutlook;
+
+    dam_overflow?: RiskOutlook;
+
+    downstream_forecast_3d_mm?: number;
+
+    dam_forecast_3d_mm?: number;
+
+    note?: string;
+  };
+  farmer_early_heads_up?: string | null;
+
   dam_alternative: {
     estimated_release_m3s?: number;
     method?: string;
@@ -60,9 +117,70 @@ export type LiveSignalsResponse = {
     dam_score?: number;
     rain_score?: number;
   };
+  dam_prediction?: DamPredictionResponse | null;
   partner_dam?: { ok?: boolean; source?: string } | null;
   risk: LiveRisk;
+  glofasForecast?: {
+    ok?: boolean;
+
+    source?: string;
+
+    dischargeForecast?: number | null;
+
+    exceedanceProbability?: number | null;
+
+    forecastDate?: string | null;
+
+    honesty?: string;
+
+    error?: string | null;
+  };
+
+  trainedRisk?: {
+    floodProbability?: number;
+
+    floodScore?: number;
+
+    modelMode?: string;
+
+    honesty?: string;
+
+    features?: Record<string, unknown>;
+  };
+
   pitch_line?: string;
+};
+
+export type DamPointerSource = "estimated" | "manual" | "forecast" | "partner";
+
+export type DamPredictionPointer = {
+  id: string;
+  label: string;
+  value: string;
+  source: DamPointerSource;
+  role?: string;
+};
+
+export type DamPredictionResponse = {
+  release_m3s?: number;
+  fill_percent?: number;
+  spillway_status?: "closed" | "partial" | "open";
+  method?: "estimated" | "manual" | "partner" | "blended";
+  data_quality?: string;
+  honesty?: string;
+  pointers?: DamPredictionPointer[];
+  manual_observation?: Record<string, unknown> | null;
+  sensor_slot?: { status: string; label: string; note: string };
+};
+
+export type DamObservation = {
+  id: number;
+  reporter: string | null;
+  release_m3s: number | null;
+  fill_percent: number | null;
+  spillway_status: string | null;
+  notes: string | null;
+  created_at: number;
 };
 
 export type EngineAction = {
@@ -99,6 +217,30 @@ export type LiveBasin = {
   alerts: AlertRecord[];
   risk: LiveRisk | null;
   pitchLine: string;
+  glofasForecast: LiveSignalsResponse["glofasForecast"] | null;
+
+  trainedRisk: LiveSignalsResponse["trainedRisk"] | null;
+
+  riskOutlook: {
+    downstreamFlood: RiskOutlook;
+
+    damOverflow: RiskOutlook;
+
+    note?: string;
+
+    downstreamForecast3dMm?: number;
+
+    damForecast3dMm?: number;
+  } | null;
+
+  farmerEarlyHeadsUp: string | null;
+
+  catchments: {
+    damUpstream: CatchmentForecast | null;
+    downstream: CatchmentForecast | null;
+  } | null;
+
+  damPrediction: DamPredictionResponse | null;
 };
 
 async function getJson<T>(path: string): Promise<T> {
@@ -109,14 +251,22 @@ async function getJson<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-function mapBasin(signals: LiveSignalsResponse, actions: EngineAction[]): LiveBasin {
+function mapBasin(
+  signals: LiveSignalsResponse,
+  actions: EngineAction[],
+  reachByWard: Record<string, LastReachedVia> = {},
+): LiveBasin {
   const risk = signals.risk;
   const rainMm = Number(signals.rain?.rain_24h_mm ?? risk.rain_mm ?? 0);
   const rain7 = Number(signals.rain?.rain_7d_mm ?? 0);
-  const release = Number(signals.dam_alternative?.estimated_release_m3s ?? risk.dam_discharge_m3s ?? 0);
+  const release = Number(
+    signals.dam_alternative?.estimated_release_m3s ?? risk.dam_discharge_m3s ?? 0,
+  );
   const rainTier = scoreToTier(Number(risk.rain_score ?? 0));
   const damTier = scoreToTier(Number(risk.dam_score ?? 0));
-  const quality = (risk.data_quality === "live_feed" ? "live" : "estimated") as DamMetrics["dataQuality"];
+  const quality = (
+    risk.data_quality === "live_feed" ? "live" : "estimated"
+  ) as DamMetrics["dataQuality"];
   const sat = Math.min(100, Math.round(rain7 / 3.5 + rainMm / 2));
   const nowLabel = `Live · updated ${new Date().toLocaleTimeString()}`;
 
@@ -140,9 +290,8 @@ function mapBasin(signals: LiveSignalsResponse, actions: EngineAction[]): LiveBa
 
   const compoundTrigger: TriggerStatus = {
     tier: risk.tier,
-    label: risk.compound_active
-      ? tierLabel(risk.tier, true)
-      : tierLabel(risk.tier),
+    label: risk.compound_active ? tierLabel(risk.tier, true) : tierLabel(risk.tier),
+
     detail: risk.plain_summary,
     etaHours: Math.round(Math.min(risk.t_rain_arrival_h, risk.t_dam_arrival_h)),
     trend: risk.compound_active ? "up" : "flat",
@@ -164,7 +313,11 @@ function mapBasin(signals: LiveSignalsResponse, actions: EngineAction[]): LiveBa
         : `Live Open-Meteo shows ${rainMm.toFixed(1)} mm in 24h upstream (${rain7.toFixed(0)} mm over 7 days). Wet soils mean new rain reaches the river faster.`,
   };
 
-  const fillEstimate = Math.min(98, Math.max(55, Math.round(70 + release / 40)));
+  const fillEstimate = Math.min(
+    98,
+    Math.max(55, Math.round(signals.dam_prediction?.fill_percent ?? 70 + release / 40)),
+  );
+  const predSpill = signals.dam_prediction?.spillway_status;
   const dam: DamMetrics = {
     name: "Gibe III",
     basin: "Omo River, Ethiopia",
@@ -173,11 +326,19 @@ function mapBasin(signals: LiveSignalsResponse, actions: EngineAction[]): LiveBa
     fullSupplyMasl: 892,
     liveStorageBcm: Math.round((fillEstimate / 100) * 14.7 * 100) / 100,
     releaseM3s: Math.round(release * 10) / 10,
-    spillwayStatus: release >= 800 ? "open" : release >= 350 ? "partial" : "closed",
+    spillwayStatus:
+      predSpill === "open" || predSpill === "partial" || predSpill === "closed"
+        ? predSpill
+        : release >= 800
+          ? "open"
+          : release >= 350
+            ? "partial"
+            : "closed",
     turbineStatus: "Estimated from rain proxy (not live SCADA)",
     lastUpdatedLabel: nowLabel,
     dataQuality: quality,
     plainSummary:
+      signals.dam_prediction?.honesty ||
       signals.dam_alternative?.honesty ||
       `Estimated release pressure ~${release.toFixed(0)} m³/s from live upstream rain. Not official Gibe III telemetry.`,
   };
@@ -195,7 +356,11 @@ function mapBasin(signals: LiveSignalsResponse, actions: EngineAction[]): LiveBa
             day,
             rainfallMm: Math.round(Number(mm) * 10) / 10,
             // Pressure index for chart (not SCADA fill)
-            reservoirPct: Math.min(98, Math.max(50, Math.round(60 + Number(mm) * 0.8 + release / 80))),
+            reservoirPct: Math.min(
+              98,
+
+              Math.max(50, Math.round(60 + Number(mm) * 0.8 + release / 80)),
+            ),
           };
         })
       : [];
@@ -204,16 +369,37 @@ function mapBasin(signals: LiveSignalsResponse, actions: EngineAction[]): LiveBa
     const distFactor = Math.min(1.2, c.distanceFromDamKm / 520);
     const etaRain = Math.round(risk.t_rain_arrival_h * distFactor);
     const etaDam = Math.round(risk.t_dam_arrival_h * distFactor);
+    const wardKey = c.name.toLowerCase().replace(/\s+/g, "_");
+
+    const via = reachByWard[wardKey];
+
     return {
       ...c,
       tier: risk.tier,
       rainEtaHours: etaRain,
       damEtaHours: etaDam,
       lastAlert: actions[0] ? "live feed" : "live risk",
+      lastReachedVia: via,
     };
   });
 
   const alerts = actionsToAlerts(actions, risk.tier);
+
+  const outlook = signals.risk_outlook;
+
+  const riskOutlook = outlook
+    ? {
+        downstreamFlood: (outlook.downstream_flood || "Stable") as RiskOutlook,
+
+        damOverflow: (outlook.dam_overflow || "Stable") as RiskOutlook,
+
+        note: outlook.note,
+
+        downstreamForecast3dMm: outlook.downstream_forecast_3d_mm,
+
+        damForecast3dMm: outlook.dam_forecast_3d_mm,
+      }
+    : null;
 
   return {
     source: "live",
@@ -228,6 +414,22 @@ function mapBasin(signals: LiveSignalsResponse, actions: EngineAction[]): LiveBa
     alerts,
     risk,
     pitchLine: signals.pitch_line || "Live Open-Meteo rain + estimated dam pressure.",
+    riskOutlook,
+
+    farmerEarlyHeadsUp: signals.farmer_early_heads_up || null,
+
+    glofasForecast: signals.glofasForecast ?? null,
+
+    trainedRisk: signals.trainedRisk ?? null,
+
+    catchments: signals.catchments
+      ? {
+          damUpstream: signals.catchments.dam_upstream ?? null,
+          downstream: signals.catchments.downstream ?? null,
+        }
+      : null,
+
+    damPrediction: signals.dam_prediction ?? null,
   };
 }
 
@@ -243,13 +445,18 @@ function actionsToAlerts(actions: EngineAction[], liveTier: RiskTier): AlertReco
     let verification: VerificationState = "confirmed";
     let message = `${a.action_type}`;
     let severity: RiskTier = liveTier;
+    const delivery: AlertRecord["delivery"] = ["USSD", "Dashboard"];
 
     if (a.action_type === "ground_truth") {
       trigger = "rain";
       verification = "confirmed";
       message = `Field report: ${details.water_level_status || "update"} (${details.affected_entity || "community"}) @ ${details.node_id || ward}`;
       const status = String(details.water_level_status || "");
-      severity = status.includes("Severe") ? "severe" : status.includes("Moderate") ? "warning" : "watch";
+      severity = status.includes("Severe")
+        ? "severe"
+        : status.includes("Moderate")
+          ? "warning"
+          : "watch";
     } else if (a.action_type === "evacuation_confirmed") {
       trigger = "compound";
       message = `Herd evacuation confirmed for ${details.ward_name || ward}`;
@@ -276,21 +483,149 @@ function actionsToAlerts(actions: EngineAction[], liveTier: RiskTier): AlertReco
       trigger,
       severity,
       communities: [ward],
-      delivery: ["USSD", "Dashboard"],
+      delivery,
+
       message,
       verification,
     };
   });
 }
 
+export type ReachBlindSpots = {
+  ok: boolean;
+
+  active_event: boolean;
+
+  tier: string;
+
+  compound_active: boolean;
+
+  unreached: string[];
+
+  unconfirmed: string[];
+
+  unreached_or_unconfirmed_count: number;
+
+  honesty_note?: string;
+};
+
+export async function fetchReachBlindSpots(): Promise<ReachBlindSpots | null> {
+  try {
+    return await getJson<ReachBlindSpots>("/api/dashboard/reach-blind-spots");
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchLiveBasin(): Promise<LiveBasin> {
-  const [signals, actionsRes] = await Promise.all([
+  const [signals, actionsRes, reachRes] = await Promise.all([
     getJson<LiveSignalsResponse>("/api/dashboard/live-signals"),
-    getJson<{ ok: boolean; actions: EngineAction[] }>("/api/dashboard/actions?limit=40").catch(() => ({
-      ok: false,
-      actions: [] as EngineAction[],
-    })),
+    getJson<{ ok: boolean; actions: EngineAction[] }>("/api/dashboard/actions?limit=40").catch(
+      () => ({
+        ok: false,
+
+        actions: [] as EngineAction[],
+      }),
+    ),
+
+    getJson<{ ok: boolean; reach: Array<{ ward_id: string; last_reached_via: string }> }>(
+      "/api/dashboard/community-reach",
+    ).catch(() => ({ ok: false, reach: [] })),
   ]);
   if (!signals?.risk) throw new Error("live-signals missing risk");
-  return mapBasin(signals, actionsRes.actions || []);
+  const reachByWard: Record<string, LastReachedVia> = {};
+
+  for (const r of reachRes.reach || []) {
+    const via = r.last_reached_via;
+
+    if (via === "SMS" || via === "USSD" || via === "Voice" || via === "Unreached") {
+      reachByWard[r.ward_id] = via;
+    }
+  }
+
+  return mapBasin(signals, actionsRes.actions || [], reachByWard);
+}
+
+export type SosChannel = "SMS" | "USSD";
+
+export type SosStatus = "new" | "being_handled" | "resolved";
+
+export type SosEntry = {
+  id: number;
+
+  phone: string;
+
+  community: string | null;
+
+  ward_id: string | null;
+
+  channel: string;
+
+  message_body: string | null;
+
+  status: SosStatus;
+
+  resent_count: number;
+
+  first_received_at: number;
+
+  last_received_at: number;
+
+  received_at_label: string;
+
+  time_since_received_s: number;
+};
+
+export async function fetchSosQueue(opts?: { limit?: number; includeResolved?: boolean }): Promise<{
+  ok: boolean;
+
+  items: SosEntry[];
+}> {
+  const limit = opts?.limit ?? 20;
+
+  const includeResolved = opts?.includeResolved ?? false;
+
+  return await getJson(
+    `/api/dashboard/sos?limit=${encodeURIComponent(String(limit))}&include_resolved=${encodeURIComponent(String(includeResolved))}`,
+  );
+}
+
+export async function setSosStatus(
+  sosId: number,
+
+  status: SosStatus,
+): Promise<{ ok: boolean; item: SosEntry }> {
+  const res = await fetch(`${engineBaseUrl()}/api/dashboard/sos/${sosId}/status`, {
+    method: "POST",
+
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+
+    body: JSON.stringify({ status }),
+  });
+
+  if (!res.ok) throw new Error(`sos status update failed (${res.status})`);
+
+  return (await res.json()) as { ok: boolean; item: SosEntry };
+}
+
+export async function fetchDamObservations(limit = 15): Promise<{
+  ok: boolean;
+  observations: DamObservation[];
+}> {
+  return getJson(`/api/dashboard/dam-observations?limit=${limit}`);
+}
+
+export async function submitDamObservation(body: {
+  release_m3s?: number | null;
+  fill_percent?: number | null;
+  spillway_status?: "closed" | "partial" | "open" | null;
+  notes?: string | null;
+  reporter?: string | null;
+}): Promise<{ ok: boolean; observation?: DamObservation; error?: string }> {
+  const res = await fetch(`${engineBaseUrl()}/api/dashboard/dam-observations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  return res.json() as Promise<{ ok: boolean; observation?: DamObservation; error?: string }>;
 }

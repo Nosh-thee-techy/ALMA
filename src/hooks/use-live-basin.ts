@@ -24,6 +24,12 @@ const FALLBACK: LiveBasin = {
   alerts: mockAlerts,
   risk: null,
   pitchLine: "Engine offline — showing last mock snapshot.",
+  glofasForecast: null,
+  trainedRisk: null,
+  riskOutlook: null,
+  farmerEarlyHeadsUp: null,
+  catchments: null,
+  damPrediction: null,
 };
 
 export function useLiveBasin(pollMs = 45000) {
