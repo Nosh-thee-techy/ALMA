@@ -68,6 +68,29 @@ def init_db() -> None:
               details_json TEXT NOT NULL DEFAULT '{}',
               created_at REAL NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS sos_queue (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              phone TEXT NOT NULL,
+              community TEXT,
+              ward_id TEXT,
+              channels TEXT NOT NULL,
+              message_body TEXT,
+              first_received_at REAL NOT NULL,
+              last_received_at REAL NOT NULL,
+              resent_count INTEGER NOT NULL DEFAULT 0,
+              status TEXT NOT NULL DEFAULT 'new',
+              created_at REAL NOT NULL,
+              updated_at REAL NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS dam_observations (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              reporter TEXT,
+              release_m3s REAL,
+              fill_percent REAL,
+              spillway_status TEXT,
+              notes TEXT,
+              created_at REAL NOT NULL
+            );
             """
         )
 
@@ -280,3 +303,150 @@ def list_cash_requests(limit: int = 50) -> list[dict[str, Any]]:
         d["details"] = json.loads(d.pop("details_json") or "{}")
         out.append(d)
     return out
+
+
+def log_sos_request(
+    phone: str,
+    *,
+    channel: str,
+    message_body: str,
+    community: str | None = None,
+    ward_id: str | None = None,
+    dedupe_window_s: float = 300.0,
+) -> dict[str, Any]:
+    """
+    Log SOS with 5-minute de-duplication per phone.
+    Confirmation replies are sent by the caller on every inbound SOS;
+    this only manages dashboard queue entries.
+    """
+    now = time.time()
+    cutoff = now - float(dedupe_window_s)
+    channel = str(channel or "unknown").strip().upper()
+    message_body = str(message_body or "")[:500]
+    community = str(community).strip() if community else None
+    ward_id = str(ward_id).strip() if ward_id else None
+
+    with _conn() as c:
+        existing = c.execute(
+            """
+            SELECT * FROM sos_queue
+            WHERE phone=? AND status!='resolved' AND last_received_at>=?
+            ORDER BY last_received_at DESC
+            LIMIT 1
+            """,
+            (phone, cutoff),
+        ).fetchone()
+
+        if existing:
+            row = dict(existing)
+            existing_id = int(row["id"])
+            existing_channels = {p for p in str(row.get("channels") or "").split(",") if p}
+            existing_channels.add(channel)
+            merged_channels = ",".join(sorted(existing_channels))
+            resent_count = int(row.get("resent_count") or 0) + 1
+            c.execute(
+                """
+                UPDATE sos_queue
+                SET community=?, ward_id=?, channels=?, message_body=?,
+                    last_received_at=?, resent_count=?, updated_at=?
+                WHERE id=?
+                """,
+                (
+                    community or row.get("community"),
+                    ward_id or row.get("ward_id"),
+                    merged_channels,
+                    message_body,
+                    now,
+                    resent_count,
+                    now,
+                    existing_id,
+                ),
+            )
+            updated = c.execute("SELECT * FROM sos_queue WHERE id=?", (existing_id,)).fetchone()
+            return dict(updated)
+
+        c.execute(
+            """
+            INSERT INTO sos_queue(
+              phone, community, ward_id, channels, message_body,
+              first_received_at, last_received_at, resent_count, status,
+              created_at, updated_at
+            ) VALUES(?,?,?,?,?,?,?,0,'new',?,?)
+            """,
+            (phone, community, ward_id, channel, message_body, now, now, now, now),
+        )
+        new_id = int(c.execute("SELECT last_insert_rowid()").fetchone()[0])
+        created = c.execute("SELECT * FROM sos_queue WHERE id=?", (new_id,)).fetchone()
+        return dict(created)
+
+
+def list_sos_queue(limit: int = 50, *, include_resolved: bool = False) -> list[dict[str, Any]]:
+    with _conn() as c:
+        if include_resolved:
+            rows = c.execute(
+                "SELECT * FROM sos_queue ORDER BY last_received_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        else:
+            rows = c.execute(
+                "SELECT * FROM sos_queue WHERE status!='resolved' ORDER BY last_received_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def set_sos_status(sos_id: int, status: str) -> dict[str, Any] | None:
+    status = str(status or "").strip().lower()
+    if status not in ("new", "being_handled", "resolved"):
+        return None
+    now = time.time()
+    with _conn() as c:
+        c.execute(
+            "UPDATE sos_queue SET status=?, updated_at=? WHERE id=?",
+            (status, now, int(sos_id)),
+        )
+        row = c.execute("SELECT * FROM sos_queue WHERE id=?", (int(sos_id),)).fetchone()
+    return dict(row) if row else None
+
+
+def add_dam_observation(
+    *,
+    reporter: str | None = None,
+    release_m3s: float | None = None,
+    fill_percent: float | None = None,
+    spillway_status: str | None = None,
+    notes: str | None = None,
+) -> dict[str, Any]:
+    now = time.time()
+    spill = (spillway_status or "").strip().lower() or None
+    if spill not in (None, "closed", "partial", "open"):
+        spill = None
+    with _conn() as c:
+        cur = c.execute(
+            """
+            INSERT INTO dam_observations(reporter, release_m3s, fill_percent, spillway_status, notes, created_at)
+            VALUES(?,?,?,?,?,?)
+            """,
+            (reporter, release_m3s, fill_percent, spill, notes, now),
+        )
+        row_id = int(cur.lastrowid)
+        row = c.execute("SELECT * FROM dam_observations WHERE id=?", (row_id,)).fetchone()
+    out = dict(row) if row else {"id": row_id, "created_at": now}
+    return out
+
+
+def latest_dam_observation() -> dict[str, Any] | None:
+    with _conn() as c:
+        row = c.execute(
+            "SELECT * FROM dam_observations ORDER BY created_at DESC LIMIT 1",
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def list_dam_observations(limit: int = 20) -> list[dict[str, Any]]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM dam_observations ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in rows]

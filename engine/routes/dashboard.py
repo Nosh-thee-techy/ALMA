@@ -1,6 +1,9 @@
 """Dashboard / desk APIs — risk snapshot + local Gemma analyst."""
 from __future__ import annotations
 
+import time
+from typing import Literal
+
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -28,6 +31,10 @@ class VoiceBriefIn(BaseModel):
     ward_id: str | None = None
     lang: str = "en"
     sector: str | None = None
+
+
+class SosQueueStatusIn(BaseModel):
+    status: Literal["being_handled", "resolved", "new"] = "being_handled"
 
 
 @router.get("/api/dashboard/risk")
@@ -80,6 +87,22 @@ def ai_health():
     return h
 
 
+@router.get("/api/dashboard/tts-health")
+def tts_health():
+    """ElevenLabs + Featherless status for voice desk / helpline."""
+    from services import elevenlabs_tts, featherless_ai
+
+    el = elevenlabs_tts.health()
+    fl = featherless_ai.health()
+    return {
+        "ok": True,
+        "elevenlabs": el,
+        "featherless": fl,
+        "voice_ready": bool(el.get("ok")),
+        "llm_fallback_ready": bool(fl.get("configured")),
+    }
+
+
 @router.get("/api/dashboard/actions")
 def list_actions(limit: int = 50):
     """USSD write-actions: evacuations, vouchers, cash, ground-truth, risk checks."""
@@ -115,6 +138,40 @@ def list_cash(limit: int = 50):
     return {"ok": True, "requests": session_store.list_cash_requests(limit)}
 
 
+@router.get("/api/dashboard/sos")
+def dashboard_sos(limit: int = 50, include_resolved: bool = False):
+    items = session_store.list_sos_queue(limit=limit, include_resolved=include_resolved)
+    now = time.time()
+    out: list[dict] = []
+    for it in items:
+        last = float(it.get("last_received_at") or it.get("created_at") or now)
+        out.append(
+            {
+                "id": int(it["id"]),
+                "phone": it.get("phone"),
+                "community": it.get("community"),
+                "ward_id": it.get("ward_id"),
+                "channel": it.get("channels"),
+                "message_body": it.get("message_body"),
+                "status": it.get("status"),
+                "resent_count": int(it.get("resent_count") or 0),
+                "first_received_at": float(it.get("first_received_at") or last),
+                "last_received_at": last,
+                "received_at_label": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(last)),
+                "time_since_received_s": int(max(0, now - last)),
+            }
+        )
+    return {"ok": True, "items": out}
+
+
+@router.post("/api/dashboard/sos/{sos_id}/status")
+def dashboard_sos_status(sos_id: int, body: SosQueueStatusIn):
+    updated = session_store.set_sos_status(sos_id, body.status)
+    if not updated:
+        return {"ok": False, "error": "not_found"}
+    return {"ok": True, "item": updated}
+
+
 @router.post("/api/dashboard/voice-brief")
 def voice_brief(body: VoiceBriefIn):
     """Desk + helpline: short spoken breakdown of live risk for a ward."""
@@ -123,6 +180,62 @@ def voice_brief(body: VoiceBriefIn):
         lang=body.lang or "en",
         sector=body.sector,
     )
+
+
+class CommunityDispatchIn(BaseModel):
+    community: str = Field(..., min_length=2)
+    region_id: str = "turkana"
+    message: str | None = None
+    sector: str = "agriculture"
+
+
+@router.post("/api/dashboard/community-dispatch")
+def community_dispatch(body: CommunityDispatchIn):
+    from services import community_dispatch
+
+    return community_dispatch.dispatch_to_community(
+        body.community,
+        region_id=body.region_id,
+        message=body.message,
+        sector=body.sector,
+    )
+
+
+@router.get("/api/dashboard/readiness-rollup")
+def readiness_rollup():
+    from services import farmer_readiness
+
+    return farmer_readiness.readiness_rollup()
+
+
+class DamObservationIn(BaseModel):
+    release_m3s: float | None = Field(None, ge=0, le=5000)
+    fill_percent: float | None = Field(None, ge=0, le=100)
+    spillway_status: Literal["closed", "partial", "open"] | None = None
+    notes: str | None = Field(None, max_length=500)
+    reporter: str | None = Field(None, max_length=120)
+
+
+@router.post("/api/dashboard/dam-observations")
+def post_dam_observation(body: DamObservationIn):
+    from services import dam_observations
+
+    if body.release_m3s is None and body.fill_percent is None and not (body.notes or "").strip():
+        return {"ok": False, "error": "Provide release, fill level, or notes"}
+    return dam_observations.add_observation(
+        release_m3s=body.release_m3s,
+        fill_percent=body.fill_percent,
+        spillway_status=body.spillway_status,
+        notes=body.notes,
+        reporter=body.reporter,
+    )
+
+
+@router.get("/api/dashboard/dam-observations")
+def get_dam_observations(limit: int = 15):
+    from services import dam_observations
+
+    return dam_observations.list_observations(limit=limit)
 
 
 @router.get("/api/dashboard/voice-helpline")

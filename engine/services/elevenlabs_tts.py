@@ -17,6 +17,48 @@ AUDIO_DIR = Path(__file__).resolve().parent.parent / "data" / "audio"
 AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def health() -> dict[str, Any]:
+    """Quick auth probe — avoids a full TTS synthesis round-trip."""
+    model_id = os.getenv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
+    out: dict[str, Any] = {
+        "configured": bool(ELEVENLABS_API_KEY),
+        "ok": False,
+        "mode": "demo",
+        "voice_id": ELEVENLABS_VOICE_ID,
+        "model_id": model_id,
+        "public_base_url": PUBLIC_BASE_URL,
+        "note": None,
+    }
+    if not ELEVENLABS_API_KEY:
+        out["note"] = "ELEVENLABS_API_KEY missing — Voice uses <Say> instead of <Play>"
+        return out
+    try:
+        with httpx.Client(timeout=8.0) as client:
+            res = client.get(
+                f"{ELEVENLABS_BASE_URL}/user",
+                headers={"xi-api-key": ELEVENLABS_API_KEY},
+            )
+        if res.status_code == 200:
+            out["ok"] = True
+            out["mode"] = "live"
+            out["note"] = "ElevenLabs ready — farmer voice uses <Play> MP3"
+            return out
+        body = res.text[:400]
+        out["mode"] = "error"
+        out["status"] = res.status_code
+        if "api_key_id_used_as_api_key" in body or "invalid_api_key" in body:
+            out["note"] = (
+                "Invalid ElevenLabs key — paste the sk_... secret from the dashboard, not the key ID"
+            )
+        else:
+            out["note"] = body or f"ElevenLabs HTTP {res.status_code}"
+        return out
+    except Exception as exc:
+        out["mode"] = "error"
+        out["note"] = str(exc)
+        return out
+
+
 def synthesize(text: str, *, voice_id: str | None = None) -> dict[str, Any]:
     """
     Generate MP3 via ElevenLabs; return a public URL for Africa's Talking <Play>.
