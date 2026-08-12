@@ -16,7 +16,9 @@ import { Route as DamRouteImport } from './routes/dam'
 import { Route as HelplineRouteImport } from './routes/helpline'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as PhoneRouteImport } from './routes/phone'
 import { Route as RainRouteImport } from './routes/rain'
+import { Route as ReadinessRouteImport } from './routes/readiness'
 import { Route as SectorGuidanceRouteImport } from './routes/sector-guidance'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SimulatorRouteImport } from './routes/simulator'
@@ -57,9 +59,19 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PhoneRoute = PhoneRouteImport.update({
+  id: '/phone',
+  path: '/phone',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RainRoute = RainRouteImport.update({
   id: '/rain',
   path: '/rain',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReadinessRoute = ReadinessRouteImport.update({
+  id: '/readiness',
+  path: '/readiness',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SectorGuidanceRoute = SectorGuidanceRouteImport.update({
@@ -91,7 +103,9 @@ export interface FileRoutesByFullPath {
   '/helpline': typeof HelplineRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/phone': typeof PhoneRoute
   '/rain': typeof RainRoute
+  '/readiness': typeof ReadinessRoute
   '/sector-guidance': typeof SectorGuidanceRoute
   '/signup': typeof SignupRoute
   '/simulator': typeof SimulatorRoute
@@ -105,7 +119,9 @@ export interface FileRoutesByTo {
   '/helpline': typeof HelplineRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/phone': typeof PhoneRoute
   '/rain': typeof RainRoute
+  '/readiness': typeof ReadinessRoute
   '/sector-guidance': typeof SectorGuidanceRoute
   '/signup': typeof SignupRoute
   '/simulator': typeof SimulatorRoute
@@ -120,7 +136,9 @@ export interface FileRoutesById {
   '/helpline': typeof HelplineRoute
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
+  '/phone': typeof PhoneRoute
   '/rain': typeof RainRoute
+  '/readiness': typeof ReadinessRoute
   '/sector-guidance': typeof SectorGuidanceRoute
   '/signup': typeof SignupRoute
   '/simulator': typeof SimulatorRoute
@@ -136,7 +154,9 @@ export interface FileRouteTypes {
     | '/helpline'
     | '/home'
     | '/login'
+    | '/phone'
     | '/rain'
+    | '/readiness'
     | '/sector-guidance'
     | '/signup'
     | '/simulator'
@@ -150,7 +170,9 @@ export interface FileRouteTypes {
     | '/helpline'
     | '/home'
     | '/login'
+    | '/phone'
     | '/rain'
+    | '/readiness'
     | '/sector-guidance'
     | '/signup'
     | '/simulator'
@@ -164,7 +186,9 @@ export interface FileRouteTypes {
     | '/helpline'
     | '/home'
     | '/login'
+    | '/phone'
     | '/rain'
+    | '/readiness'
     | '/sector-guidance'
     | '/signup'
     | '/simulator'
@@ -179,7 +203,9 @@ export interface RootRouteChildren {
   HelplineRoute: typeof HelplineRoute
   HomeRoute: typeof HomeRoute
   LoginRoute: typeof LoginRoute
+  PhoneRoute: typeof PhoneRoute
   RainRoute: typeof RainRoute
+  ReadinessRoute: typeof ReadinessRoute
   SectorGuidanceRoute: typeof SectorGuidanceRoute
   SignupRoute: typeof SignupRoute
   SimulatorRoute: typeof SimulatorRoute
@@ -237,11 +263,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/phone': {
+      id: '/phone'
+      path: '/phone'
+      fullPath: '/phone'
+      preLoaderRoute: typeof PhoneRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/rain': {
       id: '/rain'
       path: '/rain'
       fullPath: '/rain'
       preLoaderRoute: typeof RainRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/readiness': {
+      id: '/readiness'
+      path: '/readiness'
+      fullPath: '/readiness'
+      preLoaderRoute: typeof ReadinessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sector-guidance': {
@@ -283,7 +323,9 @@ const rootRouteChildren: RootRouteChildren = {
   HelplineRoute: HelplineRoute,
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
+  PhoneRoute: PhoneRoute,
   RainRoute: RainRoute,
+  ReadinessRoute: ReadinessRoute,
   SectorGuidanceRoute: SectorGuidanceRoute,
   SignupRoute: SignupRoute,
   SimulatorRoute: SimulatorRoute,

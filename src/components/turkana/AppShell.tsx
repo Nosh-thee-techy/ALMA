@@ -18,7 +18,13 @@ import {
 } from "lucide-react";
 import { AlmaLogo, AlmaMark } from "@/components/turkana/AlmaLogo";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth, roleLabels } from "@/lib/auth";
 import { pilots, type PilotId } from "@/lib/turkana-data";
@@ -28,11 +34,21 @@ const nav = [
   { to: "/home", label: "Home", hint: "Green / yellow / red + actions", icon: LayoutDashboard },
   { to: "/dam", label: "Dam", hint: "Gibe III metrics", icon: Dam },
   { to: "/rain", label: "Rain", hint: "Upstream rainfall", icon: CloudRain },
-  { to: "/sector-guidance", label: "What to do", hint: "What each sector should do", icon: BookOpen },
+  {
+    to: "/sector-guidance",
+    label: "What to do",
+    hint: "What each sector should do",
+    icon: BookOpen,
+  },
   { to: "/simulator", label: "Warn people", hint: "SMS demo", icon: MessageSquareWarning },
   { to: "/helpline", label: "Helpline", hint: "Voice agent for farmers", icon: PhoneCall },
   { to: "/alerts", label: "Alerts", hint: "Sent + verified", icon: Bell },
-  { to: "/communities", label: "Communities", hint: "Heat map + who is downstream", icon: MapPinned },
+  {
+    to: "/communities",
+    label: "Communities",
+    hint: "Heat map + who is downstream",
+    icon: MapPinned,
+  },
 ] as const;
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
@@ -50,9 +66,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
             onClick={onNavigate}
             className={cn(
               "flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors",
-              active
-                ? "bg-primary text-primary-foreground"
-                : "text-foreground hover:bg-dust",
+              active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-dust",
             )}
           >
             <Icon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
@@ -180,7 +194,12 @@ export function AppShell({
                 <SheetTitle>Menu</SheetTitle>
               </SheetHeader>
               <div className="mb-3 flex justify-end">
-                <Button variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Close menu">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setOpen(false)}
+                  aria-label="Close menu"
+                >
                   <X className="h-5 w-5" />
                 </Button>
               </div>
@@ -197,7 +216,8 @@ export function AppShell({
               <Construction className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden />
               <h2 className="mt-3 text-lg font-bold">This pilot is not open yet</h2>
               <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-                Switch to Omo–Turkana in the menu. Live pages use Open-Meteo rain + estimated dam pressure.
+                Switch to Omo–Turkana in the menu. Live pages use Open-Meteo rain + estimated dam
+                pressure.
               </p>
             </div>
           )}
@@ -205,11 +225,13 @@ export function AppShell({
 
         <footer className="border-t border-border px-4 py-4 text-xs text-muted-foreground sm:px-6">
           <p className="mx-auto max-w-5xl">
-            Rainfall can use a live Open-Meteo pull via the ALMA engine (or demo estimates on this page).
-            Gibe III has <strong className="text-foreground">no public live feed</strong> — we show demo
-            dam numbers plus an <strong className="text-foreground">upstream-rain release estimate</strong>.
-            Farmers and fishers get SMS / WhatsApp / USSD <strong className="text-foreground">*384*96428#</strong>{" "}
-            — this site is for NGO / county operators.
+            Rainfall can use a live Open-Meteo pull via the ALMA engine (or demo estimates on this
+            page). Gibe III has <strong className="text-foreground">no public live feed</strong> —
+            we show demo dam numbers plus an{" "}
+            <strong className="text-foreground">upstream-rain release estimate</strong>. Farmers and
+            fishers get SMS / WhatsApp / USSD{" "}
+            <strong className="text-foreground">*384*96428#</strong> — this site is for NGO / county
+            operators.
           </p>
         </footer>
       </div>
