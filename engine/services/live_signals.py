@@ -13,42 +13,102 @@ from typing import Any
 
 import httpx
 
+from services.forecast_outlook import (
+    build_catchment_snapshot,
+    farmer_early_heads_up,
+    outlook_summary,
+)
 from services.risk_engine import compute_compound_risk, dam_score_from_discharge, rain_score_from_mm
+from services.trained_risk_model import compute_calibrated_flood_probability
+from services.glofas_forecast import get_glofas_forecast_for_point
 
 _CACHE: dict[str, Any] = {"at": 0.0, "data": None}
 _CACHE_TTL_S = float(os.getenv("ALMA_LIVE_CACHE_S", "45"))
 
-# Upper Omo approx (south of Addis / above Gibe III)
-OMO_LAT = float(os.getenv("ALMA_OMO_LAT", "7.05"))
-OMO_LON = float(os.getenv("ALMA_OMO_LON", "37.55"))
+# Gibe III upstream basin (Ethiopia ΓÇö dam catchment)
+DAM_UPSTREAM_LAT = float(os.getenv("ALMA_OMO_LAT", "7.05"))
+DAM_UPSTREAM_LON = float(os.getenv("ALMA_OMO_LON", "37.55"))
+# Downstream community catchment (Omo delta / Turkana lake edge ΓÇö rain trigger outlook)
+DOWNSTREAM_LAT = float(os.getenv("ALMA_DOWNSTREAM_LAT", "4.05"))
+DOWNSTREAM_LON = float(os.getenv("ALMA_DOWNSTREAM_LON", "36.05"))
+
+# Backward-compatible aliases
+OMO_LAT = DAM_UPSTREAM_LAT
+OMO_LON = DAM_UPSTREAM_LON
+
 DAM_TELEMETRY_URL = os.getenv("DAM_TELEMETRY_URL", "").strip()
 DAM_TELEMETRY_TOKEN = os.getenv("DAM_TELEMETRY_TOKEN", "").strip()
 
+_FORECAST_PARAMS = (
+    "daily=precipitation_sum"
+    "&hourly=soil_moisture_0_to_1cm,soil_moisture_3_to_9cm"
+    "&past_days=7"
+    "&forecast_days=7"
+    "&timezone=Africa%2FNairobi"
+)
 
-def _open_meteo_rain_mm() -> dict[str, Any]:
+
+def _open_meteo_catchment(lat: float, lon: float) -> dict[str, Any]:
+    """Single Open-Meteo forecast call ΓÇö history + 7-day forward + soil moisture."""
     url = (
         "https://api.open-meteo.com/v1/forecast"
-        f"?latitude={OMO_LAT}&longitude={OMO_LON}"
-        "&daily=precipitation_sum&past_days=7&forecast_days=1&timezone=Africa%2FNairobi"
+        f"?latitude={lat}&longitude={lon}"
+        f"&{_FORECAST_PARAMS}"
     )
-    with httpx.Client(timeout=12.0) as client:
+    with httpx.Client(timeout=14.0) as client:
         res = client.get(url)
         res.raise_for_status()
-        data = res.json()
-    daily = data.get("daily") or {}
-    precip = list(daily.get("precipitation_sum") or [])
-    rain_24h = float(precip[-1]) if precip else 0.0
-    rain_7d = float(sum(precip[-7:])) if precip else 0.0
+        return res.json()
+
+
+def _fetch_catchment(catchment_id: str, label: str, lat: float, lon: float) -> dict[str, Any]:
+    try:
+        payload = _open_meteo_catchment(lat, lon)
+        return build_catchment_snapshot(
+            catchment_id=catchment_id,
+            label=label,
+            lat=lat,
+            lon=lon,
+            api_payload=payload,
+        )
+    except Exception as exc:
+        return {
+            "id": catchment_id,
+            "label": label,
+            "lat": lat,
+            "lon": lon,
+            "ok": False,
+            "error": str(exc),
+            "rain_24h_mm": 0.0,
+            "rain_7d_mm": 0.0,
+            "forecast_rainfall": {"next3_day": 0.0, "next7_day": 0.0},
+            "soil_moisture": {"current": 0.0, "trend": "stable"},
+            "risk_outlook": "Stable",
+        }
+
+
+def _open_meteo_rain_mm() -> dict[str, Any]:
+    """Backward-compatible rain block ΓÇö dam upstream catchment fields preserved."""
+    upstream = _fetch_catchment(
+        "dam_upstream",
+        "Live Open-Meteo rain over Upper Omo (Gibe III upstream ΓÇö not gauge network)",
+        DAM_UPSTREAM_LAT,
+        DAM_UPSTREAM_LON,
+    )
     return {
-        "ok": True,
+        "ok": upstream.get("ok", True) is not False,
         "source": "open-meteo",
-        "lat": OMO_LAT,
-        "lon": OMO_LON,
-        "rain_24h_mm": round(rain_24h, 1),
-        "rain_7d_mm": round(rain_7d, 1),
-        "daily_mm": precip[-7:],
-        "dates": (daily.get("time") or [])[-7:],
-        "label": "Live Open-Meteo rain over Upper Omo (not CHIRPS, not gauge network)",
+        "lat": DAM_UPSTREAM_LAT,
+        "lon": DAM_UPSTREAM_LON,
+        "rain_24h_mm": upstream.get("rain_24h_mm", 0.0),
+        "rain_7d_mm": upstream.get("rain_7d_mm", 0.0),
+        "daily_mm": upstream.get("daily_mm") or [],
+        "dates": upstream.get("dates") or [],
+        "label": upstream.get("label"),
+        "forecast_rainfall": upstream.get("forecast_rainfall"),
+        "soil_moisture": upstream.get("soil_moisture"),
+        "risk_outlook": upstream.get("risk_outlook"),
+        "error": upstream.get("error"),
     }
 
 
@@ -106,6 +166,19 @@ def get_live_signals(*, force: bool = False) -> dict[str, Any]:
     ):
         return _CACHE["data"]
 
+    dam_upstream = _fetch_catchment(
+        "dam_upstream",
+        "Gibe III upstream basin (Ethiopia)",
+        DAM_UPSTREAM_LAT,
+        DAM_UPSTREAM_LON,
+    )
+    downstream = _fetch_catchment(
+        "downstream",
+        "Downstream OmoΓÇôTurkana community catchment",
+        DOWNSTREAM_LAT,
+        DOWNSTREAM_LON,
+    )
+
     rain: dict[str, Any]
     try:
         rain = _open_meteo_rain_mm()
@@ -142,17 +215,114 @@ def get_live_signals(*, force: bool = False) -> dict[str, Any]:
         float(rain.get("rain_24h_mm") or 0),
         float(release),
         data_quality=data_quality,
+        ml_flood_probability=None,
+        ml_model_mode=None,
+        ml_honesty=None,
+    )
+
+    # ---------------------------------------------------------------------
+    # Task 3: Small calibrated risk model (rainfall accumulation + soil trend)
+    # ---------------------------------------------------------------------
+    from datetime import datetime as dt
+
+    forecast_rain = (downstream.get("forecast_rainfall") or {}) if isinstance(downstream, dict) else {}
+    soil = (downstream.get("soil_moisture") or {}) if isinstance(downstream, dict) else {}
+    risk_outlook_str = str(downstream.get("risk_outlook") or "Stable")
+
+    rain_3d_mm = float(forecast_rain.get("next3_day") or 0.0)
+    rain_7d_mm = float(forecast_rain.get("next7_day") or 0.0)
+    soil_trend = str(soil.get("trend") or "stable")
+
+    calibrated = compute_calibrated_flood_probability(
+        rain_3d_mm=rain_3d_mm,
+        rain_7d_mm=rain_7d_mm,
+        soil_moisture_trend=soil_trend,
+        risk_outlook=risk_outlook_str,
+        now=dt.utcnow(),
+    )
+
+    # ---------------------------------------------------------------------
+    # Task 2: GloFAS enhancement (best-effort) ΓÇö time-boxed
+    # ---------------------------------------------------------------------
+    glofas = get_glofas_forecast_for_point(lat=float(downstream.get("lat") or DOWNSTREAM_LAT), lon=float(downstream.get("lon") or DOWNSTREAM_LON), now=dt.utcnow())
+
+    # Only switch to glofas_enhanced if both discharge forecast and exceedance
+    # probability are available.
+    enhanced = calibrated
+    if glofas.ok and glofas.dischargeForecast is not None and glofas.exceedanceProbability is not None:
+        enhanced = compute_calibrated_flood_probability(
+            rain_3d_mm=rain_3d_mm,
+            rain_7d_mm=rain_7d_mm,
+            soil_moisture_trend=soil_trend,
+            risk_outlook=risk_outlook_str,
+            now=dt.utcnow(),
+            glofas_discharge_forecast_m3s=float(glofas.dischargeForecast),
+            glofas_exceedance_probability=float(glofas.exceedanceProbability),
+        )
+
+    # Re-run compound risk with ML corroboration applied.
+    risk = compute_compound_risk(
+        float(rain.get("rain_24h_mm") or 0),
+        float(release),
+        data_quality=data_quality,
+        ml_flood_probability=enhanced.floodProbability,
+        ml_model_mode=enhanced.modelMode,
+        ml_honesty=enhanced.honesty,
+    )
+
+    outlook = outlook_summary(downstream, dam_upstream)
+    early_farmer = farmer_early_heads_up(
+        tier=str(risk.tier),
+        compound_active=bool(risk.compound_active),
+        downstream_outlook=str(outlook.get("downstream_flood") or "Stable"),
+        dam_outlook=str(outlook.get("dam_overflow") or "Stable"),
+    )
+
+    from services.dam_observations import build_dam_prediction
+
+    dam_prediction = build_dam_prediction(
+        rain_proxy=pressure,
+        rain=rain,
+        dam_upstream=dam_upstream if isinstance(dam_upstream, dict) else None,
+        risk_outlook=outlook if isinstance(outlook, dict) else None,
+        glofas=glofas.to_dict() if glofas else None,
+        partner=partner,
+        release_m3s=float(release),
+        data_quality=data_quality,
+    )
+    release = float(dam_prediction["release_m3s"])
+    pressure = {**pressure, "estimated_release_m3s": round(release, 1)}
+
+    # Re-run compound risk with blended release (manual reports nudge dam score).
+    risk = compute_compound_risk(
+        float(rain.get("rain_24h_mm") or 0),
+        float(release),
+        data_quality=data_quality,
+        ml_flood_probability=enhanced.floodProbability,
+        ml_model_mode=enhanced.modelMode,
+        ml_honesty=enhanced.honesty,
     )
 
     out = {
         "ok": True,
         "rain": rain,
+        "catchments": {
+            "dam_upstream": dam_upstream,
+            "downstream": downstream,
+        },
+        "risk_outlook": outlook,
+        "farmer_early_heads_up": early_farmer,
         "dam_alternative": pressure,
+        "dam_prediction": dam_prediction,
         "partner_dam": partner,
         "risk": risk.to_dict(),
+        "glofasForecast": glofas.to_dict(),
+        "trainedRisk": enhanced.to_dict(),
         "pitch_line": (
-            "Live piece today: upstream rain (Open-Meteo) + estimated dam pressure. "
-            "Official Gibe III SCADA needs a partner URL."
+            "Live: upstream rain + predicted dam pressure (rain + forecast pointers, "
+            "optional operator reports) + forecast-informed outlook (Open-Meteo). "
+            "Includes a calibrated (non-deep) risk corroboration term; Gemma only "
+            "converts outputs to guidance."
         ),
     }
     _CACHE["at"] = now
