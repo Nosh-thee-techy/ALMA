@@ -91,6 +91,31 @@ def init_db() -> None:
               notes TEXT,
               created_at REAL NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS farmers (
+              phone TEXT PRIMARY KEY,
+              profile_json TEXT NOT NULL DEFAULT '{}',
+              updated_at REAL NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS community_reach (
+              ward_id TEXT PRIMARY KEY,
+              last_reached_via TEXT NOT NULL,
+              updated_at REAL NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS recovery_interest (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              phone TEXT NOT NULL,
+              ward_id TEXT,
+              community TEXT,
+              region_id TEXT,
+              created_at REAL NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS tier_history (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              region_id TEXT NOT NULL,
+              tier TEXT NOT NULL,
+              compound INTEGER NOT NULL DEFAULT 0,
+              at REAL NOT NULL
+            );
             """
         )
 
@@ -447,6 +472,144 @@ def list_dam_observations(limit: int = 20) -> list[dict[str, Any]]:
     with _conn() as c:
         rows = c.execute(
             "SELECT * FROM dam_observations ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+# --- Farmer readiness / NGO dispatch helpers ---
+
+def upsert_farmer(profile: dict[str, Any]) -> dict[str, Any]:
+    phone = str(profile.get("phoneNumber") or profile.get("phone") or "").strip()
+    if not phone:
+        raise ValueError("farmer phone required")
+    now = time.time()
+    profile = {**profile, "phoneNumber": phone, "updatedAt": now}
+    with _conn() as c:
+        c.execute(
+            """
+            INSERT INTO farmers(phone, profile_json, updated_at) VALUES(?,?,?)
+            ON CONFLICT(phone) DO UPDATE SET profile_json=excluded.profile_json, updated_at=excluded.updated_at
+            """,
+            (phone, json.dumps(profile), now),
+        )
+    return profile
+
+
+def get_farmer(phone: str) -> dict[str, Any] | None:
+    with _conn() as c:
+        row = c.execute("SELECT profile_json FROM farmers WHERE phone=?", (phone,)).fetchone()
+    if not row:
+        return None
+    try:
+        return json.loads(row["profile_json"])
+    except json.JSONDecodeError:
+        return None
+
+
+def list_farmers() -> list[dict[str, Any]]:
+    with _conn() as c:
+        rows = c.execute("SELECT profile_json FROM farmers ORDER BY updated_at DESC").fetchall()
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        try:
+            out.append(json.loads(r["profile_json"]))
+        except json.JSONDecodeError:
+            continue
+    return out
+
+
+def set_last_reached_via(ward_id: str, via: str) -> None:
+    with _conn() as c:
+        c.execute(
+            """
+            INSERT INTO community_reach(ward_id, last_reached_via, updated_at) VALUES(?,?,?)
+            ON CONFLICT(ward_id) DO UPDATE SET last_reached_via=excluded.last_reached_via, updated_at=excluded.updated_at
+            """,
+            (ward_id, via, time.time()),
+        )
+
+
+def list_community_reach() -> list[dict[str, Any]]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT ward_id, last_reached_via, updated_at FROM community_reach ORDER BY updated_at DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def record_risk_tier(region_id: str, tier: str, compound_active: bool) -> None:
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO tier_history(region_id, tier, compound, at) VALUES(?,?,?,?)",
+            (region_id, tier, 1 if compound_active else 0, time.time()),
+        )
+
+
+def had_severe_or_compound(region_id: str, within_s: float = 72 * 3600) -> bool:
+    cutoff = time.time() - within_s
+    with _conn() as c:
+        row = c.execute(
+            """
+            SELECT 1 FROM tier_history
+            WHERE region_id=? AND at>=? AND (compound=1 OR tier='severe')
+            LIMIT 1
+            """,
+            (region_id, cutoff),
+        ).fetchone()
+    return bool(row)
+
+
+def severe_or_compound_hours(region_id: str, within_s: float = 72 * 3600) -> float:
+    cutoff = time.time() - within_s
+    now = time.time()
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT tier, compound, at FROM tier_history WHERE region_id=? AND at>=? ORDER BY at ASC",
+            (region_id, cutoff),
+        ).fetchall()
+    if not rows:
+        return 0.0
+    hours = 0.0
+    for i, row in enumerate(rows):
+        start = float(row["at"])
+        end = float(rows[i + 1]["at"]) if i + 1 < len(rows) else now
+        if int(row["compound"]) == 1 or row["tier"] == "severe":
+            hours += max(0.0, (end - start) / 3600.0)
+    return round(hours, 2)
+
+
+def recovery_eligible(region_id: str) -> bool:
+    return severe_or_compound_hours(region_id) >= 6.0
+
+
+def mark_post_risk_transition(region_id: str, event_phase: str) -> bool:
+    # Demo stub — real transition tracking can be layered later.
+    _ = (region_id, event_phase)
+    return False
+
+
+def log_recovery_interest(
+    phone: str,
+    ward_id: str,
+    *,
+    community: str | None = None,
+    region_id: str | None = None,
+) -> None:
+    with _conn() as c:
+        c.execute(
+            """
+            INSERT INTO recovery_interest(phone, ward_id, community, region_id, created_at)
+            VALUES(?,?,?,?,?)
+            """,
+            (phone, ward_id, community, region_id, time.time()),
+        )
+
+
+def list_recovery_interest(limit: int = 50) -> list[dict[str, Any]]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM recovery_interest ORDER BY created_at DESC LIMIT ?",
             (limit,),
         ).fetchall()
     return [dict(r) for r in rows]

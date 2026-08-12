@@ -208,6 +208,11 @@ def readiness_rollup():
     return farmer_readiness.readiness_rollup()
 
 
+@router.get("/api/dashboard/community-reach")
+def community_reach():
+    return {"ok": True, "reach": session_store.list_community_reach()}
+
+
 class DamObservationIn(BaseModel):
     release_m3s: float | None = Field(None, ge=0, le=5000)
     fill_percent: float | None = Field(None, ge=0, le=100)
