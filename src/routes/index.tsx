@@ -1,8 +1,11 @@
-// Public landing — signup/login entry. Operators only; farmers use USSD.
+// Public landing — operator desk entry. Farmers use after.localhost / USSD / voice.
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { FarmerAfterApp } from "@/components/turkana/FarmerAfterApp";
 import { AlmaLogo } from "@/components/turkana/AlmaLogo";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
+import { isFarmerAppHost } from "@/lib/farmer-app";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -15,8 +18,24 @@ export const Route = createFileRoute("/")({
       },
     ],
   }),
-  component: LandingPage,
+  component: LandingOrFarmer,
 });
+
+function LandingOrFarmer() {
+  const [ready, setReady] = useState(false);
+  const [farmer, setFarmer] = useState(false);
+
+  useEffect(() => {
+    setFarmer(isFarmerAppHost());
+    setReady(true);
+  }, []);
+
+  if (!ready) {
+    return <div className="min-h-dvh bg-background" />;
+  }
+  if (farmer) return <FarmerAfterApp />;
+  return <LandingPage />;
+}
 
 function LandingPage() {
   const { session } = useAuth();
@@ -57,7 +76,7 @@ function LandingPage() {
         <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
           ALMA is the Early Action desk for the Omo–Turkana basin. It turns Gibe III status and
           upstream rainfall into a simple green / yellow / red picture — then sector playbooks and
-          SMS warnings.
+          SMS warnings. Farmers use the After phone app, USSD, and voice — not this desk.
         </p>
 
         <div className="mt-8 flex flex-wrap gap-3">
