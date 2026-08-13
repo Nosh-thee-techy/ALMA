@@ -2,9 +2,11 @@
   Operator Home — traffic light + actions first. Deep dam/rain live on their own pages.
 */
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, CloudRain, Dam } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowRight, CloudRain, Dam, Loader2 } from "lucide-react";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { toast } from "sonner";
 
+import { askAlmaExplain } from "@/lib/alma-agent-events";
 import { AppShell } from "@/components/turkana/AppShell";
 import {
   DeskCard,
@@ -15,22 +17,29 @@ import {
 } from "@/components/turkana/DeskCard";
 
 import { LiveSourceBadge } from "@/components/turkana/LiveSourceBadge";
-import { VoiceHelpline } from "@/components/turkana/VoiceHelpline";
-import { WeatherHeatMap } from "@/components/turkana/WeatherHeatMap";
 import { RiskOutlookPanel } from "@/components/turkana/RiskOutlookPanel";
 
 import { SosQueuePanel } from "@/components/turkana/SosQueuePanel";
-
 import { Button } from "@/components/ui/button";
 import { useLiveBasin } from "@/hooks/use-live-basin";
-import { fetchReachBlindSpots, type ReachBlindSpots } from "@/lib/alma-engine";
-
+import {
+  dispatchCommunityFollowUp,
+  fetchReachBlindSpots,
+  markCommunityReached,
+  type ReachBlindSpots,
+} from "@/lib/alma-engine";
 import { RequireAuth } from "@/lib/require-auth";
 import { lightMeta, tierToLight, worstLight, type TrafficLight } from "@/lib/status-light";
 import { tierMeta, verificationMeta } from "@/lib/turkana-data";
 import { ussdDialCode } from "@/lib/ussd-dial";
-
 import { cn } from "@/lib/utils";
+
+const WeatherHeatMap = lazy(() =>
+  import("@/components/turkana/WeatherHeatMap").then((m) => ({ default: m.WeatherHeatMap })),
+);
+const VoiceHelpline = lazy(() =>
+  import("@/components/turkana/VoiceHelpline").then((m) => ({ default: m.VoiceHelpline })),
+);
 
 export const Route = createFileRoute("/home")({
   head: () => ({
@@ -47,6 +56,7 @@ function HomePage() {
   const { data, loading, error, isLive } = useLiveBasin();
   const { damTrigger, rainfallTrigger, compoundTrigger, dam, rain, alerts } = data;
   const [blindSpots, setBlindSpots] = useState<ReachBlindSpots | null>(null);
+  const [busyWard, setBusyWard] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,13 +91,47 @@ function HomePage() {
 
     .slice(0, 5);
 
-  // Surfacing unreached communities is a deliberate honesty signal ΓÇö the
-
+  // Surfacing unreached communities is a deliberate honesty signal — the
   // system should show responders its own blind spots so they know who
-
   // to follow up on manually, not claim full reach.
-
   const blindCount = blindSpots?.active_event ? blindSpots.unreached_or_unconfirmed_count : 0;
+  const blindWards = blindSpots?.active_event ? blindSpots.wards || [] : [];
+
+  async function refreshBlindSpots() {
+    const r = await fetchReachBlindSpots();
+    setBlindSpots(r);
+  }
+
+  async function followUpSms(wardId: string, community: string) {
+    setBusyWard(wardId);
+    try {
+      const regionId = ["omorate", "kalam"].includes(wardId) ? "omo" : "turkana";
+      const res = await dispatchCommunityFollowUp(community, regionId);
+      if (!res.ok) throw new Error(res.error || "Follow-up failed");
+      toast.success(`Follow-up SMS queued for ${community}`, {
+        description: `${res.contactCount ?? 0} contact(s)`,
+      });
+      await refreshBlindSpots();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not send follow-up");
+    } finally {
+      setBusyWard(null);
+    }
+  }
+
+  async function markReached(wardId: string, community: string) {
+    setBusyWard(wardId);
+    try {
+      const res = await markCommunityReached(wardId, "Manual", "Operator radio/call follow-up");
+      if (!res.ok) throw new Error(res.error || "Could not mark reached");
+      toast.success(`Marked ${community} as reached (manual)`);
+      await refreshBlindSpots();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not mark reached");
+    } finally {
+      setBusyWard(null);
+    }
+  }
 
   return (
     <AppShell>
@@ -120,6 +164,19 @@ function HomePage() {
             />
 
             <h2 className="text-xl font-bold tracking-tight sm:text-2xl">{meta.label}</h2>
+            <Button
+              type="button"
+              size="sm"
+              variant={overall === "red" ? "secondary" : "outline"}
+              className={cn(
+                "ml-auto font-bold",
+                overall === "red" &&
+                  "bg-white text-[oklch(0.35_0.16_28)] hover:bg-white/90 dark:bg-card dark:text-foreground",
+              )}
+              onClick={() => askAlmaExplain("en")}
+            >
+              Ask Alma to explain
+            </Button>
           </div>
           <p
             className={cn(
@@ -148,7 +205,7 @@ function HomePage() {
 
                 className="bg-act font-bold text-act-foreground hover:bg-act/90"
               >
-                <Link to="/sector-guidance">
+                <Link to="/helpline">
                   What should each sector do?
                   <ArrowRight className="h-4 w-4" />
                 </Link>
@@ -181,7 +238,7 @@ function HomePage() {
 
                 className="bg-act font-bold text-act-foreground hover:bg-act/90"
               >
-                <Link to="/sector-guidance">Review sector playbooks</Link>
+                <Link to="/helpline">Review sector playbooks</Link>
               </Button>
               <Button
                 asChild
@@ -223,10 +280,8 @@ function HomePage() {
             to="/rain"
             cta="Open rain details"
           />
-          {/* Surfacing unreached communities is a deliberate honesty signal ΓÇö the
-
+          {/* Surfacing unreached communities is a deliberate honesty signal — the
               system should show responders its own blind spots so they know who
-
               to follow up on manually, not claim full reach. */}
 
           <DeskCard className={cn(blindCount > 0 && "border-risk-warning/50")}>
@@ -242,31 +297,74 @@ function HomePage() {
                     : "bg-muted text-muted-foreground",
                 )}
               >
-                {blindSpots?.active_event ? blindCount : "ΓÇö"}
+                {blindSpots?.active_event ? blindCount : "—"}
               </span>
             </div>
 
             <p className="mt-4 text-sm font-bold tabular-nums text-foreground">
               {blindSpots?.active_event
-                ? `${blindCount} communities unreached or unconfirmed`
-                : "No Warning/Severe/Compound event ΓÇö count idle"}
+                ? `${blindCount} communities still unreached`
+                : "No Warning / Severe / Compound event — follow-up list is idle"}
             </p>
 
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Follow up manually on wards the system could not confirm. Honesty over false
-              full-reach claims.
+              {blindSpots?.honesty_note ||
+                "We only count a community as reached when SMS, USSD, voice, or a manual radio/call follow-up is logged. Do not claim full basin coverage."}
             </p>
+
+            {blindWards.length > 0 && (
+              <ul className="mt-4 max-h-48 space-y-2 overflow-y-auto">
+                {blindWards.map((w) => {
+                  const community =
+                    w.community || w.ward_id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+                  const busy = busyWard === w.ward_id;
+                  return (
+                    <li
+                      key={w.ward_id}
+                      className="rounded-lg border border-border bg-dust/60 px-3 py-2"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-bold">{community}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            Status: {w.last_reached_via || "Unreached"}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 rounded-full px-2.5 text-xs font-bold"
+                            disabled={busy}
+                            onClick={() => void followUpSms(w.ward_id, community)}
+                          >
+                            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Send SMS"}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-8 rounded-full bg-act px-2.5 text-xs font-bold text-act-foreground hover:bg-act/90"
+                            disabled={busy}
+                            onClick={() => void markReached(w.ward_id, community)}
+                          >
+                            Mark reached
+                          </Button>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
 
             <Button
               asChild
-
               variant="outline"
-
               size="sm"
-
               className="mt-5 rounded-full border-border/80 bg-dust font-bold"
             >
-              <Link to="/communities">Open communities</Link>
+              <Link to="/communities">Open communities map</Link>
             </Button>
           </DeskCard>
         </div>
@@ -275,7 +373,7 @@ function HomePage() {
           <RiskOutlookPanel
             downstreamFlood={data.riskOutlook.downstreamFlood}
 
-            damOverflow={data.riskOutlook.damOverflow}
+            damReleaseOutlook={data.riskOutlook.damReleaseOutlook}
 
             note={data.riskOutlook.note}
 
@@ -336,8 +434,14 @@ function HomePage() {
           </DeskCard>
         )}
 
-        <WeatherHeatMap />
-        <VoiceHelpline />
+        <Suspense
+          fallback={
+            <p className="text-sm text-muted-foreground">Loading map and helpline…</p>
+          }
+        >
+          <WeatherHeatMap />
+          <VoiceHelpline />
+        </Suspense>
 
         <DeskCard>
           <DeskCardHeader

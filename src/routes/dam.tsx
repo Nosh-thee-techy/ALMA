@@ -1,32 +1,23 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Activity, Dam, PenLine, Radio, Satellite } from "lucide-react";
-import { toast } from "sonner";
+import { Dam } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { AppShell } from "@/components/turkana/AppShell";
 import { DeskCard, DeskCardHeader, DeskMetric } from "@/components/turkana/DeskCard";
 import { LiveSourceBadge } from "@/components/turkana/LiveSourceBadge";
 import { OutlookBadge } from "@/components/turkana/RiskOutlookPanel";
-import { TrendChart } from "@/components/turkana/TrendChart";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useLiveBasin } from "@/hooks/use-live-basin";
-import {
-  engineBaseUrl,
-  fetchDamObservations,
-  submitDamObservation,
-  type DamObservation,
-  type DamPointerSource,
-  type DamPredictionPointer,
-} from "@/lib/alma-engine";
 import { RequireAuth } from "@/lib/require-auth";
 import { lightMeta, tierToLight } from "@/lib/status-light";
 import { cn } from "@/lib/utils";
@@ -41,21 +32,6 @@ export const Route = createFileRoute("/dam")({
     </RequireAuth>
   ),
 });
-
-const sourceBadge: Record<DamPointerSource | "sensor", string> = {
-  estimated: "bg-secondary text-foreground",
-  forecast: "bg-primary/10 text-primary",
-  manual: "bg-act/15 text-act-foreground",
-  partner: "bg-risk-warning/15 text-risk-warning",
-  sensor: "bg-muted text-muted-foreground",
-};
-
-function methodLabel(method?: string): string {
-  if (method === "blended") return "Predicted + operator blend";
-  if (method === "manual") return "Operator report";
-  if (method === "partner") return "Partner telemetry";
-  return "Rain + forecast model";
-}
 
 function spillwayLabel(status: string): string {
   if (status === "partial") return "Partly open";
@@ -72,60 +48,25 @@ function DamPage() {
   const light = tierToLight(damTrigger.tier);
   const lm = lightMeta[light];
 
-  const [observations, setObservations] = useState<DamObservation[]>([]);
-  const [obsLoading, setObsLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [release, setRelease] = useState("");
-  const [fill, setFill] = useState("");
-  const [spillway, setSpillway] = useState<string>("");
-  const [notes, setNotes] = useState("");
-  const [reporter, setReporter] = useState("");
+  const rainBars = [
+    { label: "24h", mm: Number(data.rain.rain24hMm ?? 0) },
+    { label: "7d", mm: Number(data.rain.rain7dMm ?? 0) },
+    {
+      label: "3d fcst",
+      mm: Number(upstream?.forecast_rainfall?.next3_day ?? 0),
+    },
+    {
+      label: "7d fcst",
+      mm: Number(upstream?.forecast_rainfall?.next7_day ?? 0),
+    },
+  ];
 
-  async function loadObservations() {
-    setObsLoading(true);
-    try {
-      const res = await fetchDamObservations(10);
-      if (res.ok) setObservations(res.observations || []);
-    } catch {
-      // Desk still works offline
-    } finally {
-      setObsLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void loadObservations();
-  }, []);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const res = await submitDamObservation({
-        release_m3s: release.trim() ? Number(release) : null,
-        fill_percent: fill.trim() ? Number(fill) : null,
-        spillway_status:
-          spillway === "closed" || spillway === "partial" || spillway === "open"
-            ? spillway
-            : null,
-        notes: notes.trim() || null,
-        reporter: reporter.trim() || null,
-      });
-      if (!res.ok) throw new Error(res.error || "Could not save report");
-      toast.success("Operator report saved — prediction will blend on next refresh");
-      setRelease("");
-      setFill("");
-      setSpillway("");
-      setNotes("");
-      await loadObservations();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  const pointers: DamPredictionPointer[] = pred?.pointers ?? [];
+  const pressureSeries = (data.trend || []).map((t) => ({
+    day: t.day,
+    rainMm: t.rainfallMm,
+    releaseProxy: Math.round((t.reservoirPct / 100) * Math.max(120, dam.releaseM3s || 200)),
+    fillIndex: t.reservoirPct,
+  }));
 
   return (
     <AppShell>
@@ -144,7 +85,7 @@ function DamPage() {
                 <Dam className="h-6 w-6" aria-hidden />
               </div>
               <div>
-                <p className="text-sm font-bold text-primary">Dam page</p>
+                <p className="text-sm font-bold text-primary">Dam only</p>
                 <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
                   {dam.name}{" "}
                   <span className="font-normal text-muted-foreground">· {dam.basin}</span>
@@ -158,379 +99,170 @@ function DamPage() {
           <p className="mt-4 max-w-3xl text-base leading-relaxed text-foreground">
             {dam.plainSummary}
           </p>
-          <p className="mt-2 text-xs font-bold text-muted-foreground">
-            {dam.lastUpdatedLabel} · quality: {dam.dataQuality} ·{" "}
-            {methodLabel(pred?.method)}
+          <p className="mt-2 text-xs text-muted-foreground">
+            {dam.lastUpdatedLabel} · quality: {dam.dataQuality} · predicted release{" "}
+            {dam.releaseM3s} m³/s · spillway {spillwayLabel(dam.spillwayStatus)}
+            {data.riskOutlook ? ` · outlook ${data.riskOutlook.damReleaseOutlook}` : ""}
+          </p>
+          {data.riskOutlook ? (
+            <div className="mt-2">
+              <OutlookBadge outlook={data.riskOutlook.damReleaseOutlook} />
+            </div>
+          ) : null}
+          <p className="mt-3 text-sm text-muted-foreground">
+            Ground-truth forms live on the{" "}
+            <Link to="/phone" className="font-bold text-primary">
+              phone / USSD desk
+            </Link>{" "}
+            (WhatsApp &amp; field reports). Rain + dam collision is on the{" "}
+            <Link to="/compound" className="font-bold text-primary">
+              Compound page
+            </Link>
+            .
           </p>
         </DeskCard>
 
-        <DeskCard>
-          <DeskCardHeader
-            title="Yes — we predict dam levels"
-            description="No public Gibe III SCADA in this prototype. ALMA estimates reservoir pressure and release from upstream rain, soil wetness, forward forecast, optional GloFAS, and your manual reports."
-          />
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <DeskCard>
             <DeskMetric
               label="Predicted release"
               value={`${dam.releaseM3s} m³/s`}
-              note={pred?.method === "blended" ? "Rain model + operator blend" : "Rain → release heuristic"}
+              note={pred?.method === "blended" ? "Blended with reports" : "Rain → release model"}
             />
+          </DeskCard>
+          <DeskCard>
             <DeskMetric
-              label="Reservoir level (index)"
+              label="Reservoir index"
               value={`${dam.fillPercent}%`}
-              note="Derived index — not official EEP %"
+              note="Not official EEP SCADA %"
             />
+          </DeskCard>
+          <DeskCard>
             <DeskMetric
-              label="Spillway (predicted)"
+              label="Spillway"
               value={spillwayLabel(dam.spillwayStatus)}
-              note="From release pressure or your report"
+              note={`Storage ~${dam.liveStorageBcm} BCM`}
             />
+          </DeskCard>
+          <DeskCard>
             <DeskMetric
-              label="Dam overflow outlook"
-              value={data.riskOutlook?.damOverflow ?? "Stable"}
-              note={`3d forecast ${data.riskOutlook?.damForecast3dMm ?? "—"} mm upstream`}
+              label="Dam ETA"
+              value={`~${damTrigger.etaHours ?? "—"} h`}
+              note="Wave travel estimate"
             />
-          </div>
-          {data.riskOutlook && (
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold text-muted-foreground">Forward trend:</span>
-              <OutlookBadge outlook={data.riskOutlook.damOverflow} />
-              {data.riskOutlook.note ? (
-                <span className="text-xs text-muted-foreground">{data.riskOutlook.note}</span>
-              ) : null}
-            </div>
-          )}
-        </DeskCard>
-
-        <DeskCard>
-          <DeskCardHeader
-            title="Prediction inputs"
-            description="Every pointer below feeds the estimated operating picture. Manual reports nudge the blend for 48 hours."
-          />
-          <ul className="mt-4 divide-y divide-border/80">
-            {pointers.length > 0 ? (
-              pointers.map((p) => (
-                <li key={p.id} className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold">{p.label}</p>
-                    {p.role ? (
-                      <p className="mt-0.5 text-xs text-muted-foreground">{p.role}</p>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-bold tabular-nums">{p.value}</span>
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
-                        sourceBadge[p.source] ?? sourceBadge.estimated,
-                      )}
-                    >
-                      {p.source}
-                    </span>
-                  </div>
-                </li>
-              ))
-            ) : (
-              <>
-                <PointerFallback label="Upstream rain (24h)" value={`${data.rain.rain24hMm} mm`} />
-                <PointerFallback label="Upstream rain (7d)" value={`${data.rain.rain7dMm} mm`} />
-                <PointerFallback
-                  label="Forecast rain (3d)"
-                  value={`${upstream?.forecast_rainfall?.next3_day ?? "—"} mm`}
-                  source="forecast"
-                />
-                <PointerFallback
-                  label="Soil moisture trend"
-                  value={upstream?.soil_moisture?.trend ?? "stable"}
-                  source="forecast"
-                />
-              </>
-            )}
-          </ul>
-        </DeskCard>
+          </DeskCard>
+        </div>
 
         <div className="grid gap-5 lg:grid-cols-2">
-          <DeskCard>
-            <DeskCardHeader
-              title="Add operator ground truth"
-              description="Phone call from EEP, field visit, or partner report — improves the prediction until sensors arrive."
-              action={<PenLine className="h-5 w-5 text-primary" aria-hidden />}
-            />
-            <form className="mt-5 space-y-4" onSubmit={(e) => void handleSubmit(e)}>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="dam-release">Observed release (m³/s)</Label>
-                  <Input
-                    id="dam-release"
-                    type="number"
-                    min={0}
-                    step={1}
-                    placeholder="e.g. 420"
-                    value={release}
-                    onChange={(e) => setRelease(e.target.value)}
+          <DeskCard padded={false}>
+            <div className="border-b border-border/80 px-5 py-4">
+              <DeskCardHeader
+                title="Upstream rain feeding the dam"
+                description="Past totals vs forward forecast for the Gibe catchment."
+              />
+            </div>
+            <div className="h-64 p-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={rainBars} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={12} />
+                  <YAxis stroke="var(--muted-foreground)" fontSize={12} unit=" mm" />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--popover)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                    }}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dam-fill">Reservoir level (%)</Label>
-                  <Input
-                    id="dam-fill"
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.1}
-                    placeholder="e.g. 91"
-                    value={fill}
-                    onChange={(e) => setFill(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dam-spill">Spillway status</Label>
-                <Select
-                  value={spillway || undefined}
-                  onValueChange={setSpillway}
-                >
-                  <SelectTrigger id="dam-spill">
-                    <SelectValue placeholder="Select if known" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="closed">Closed</SelectItem>
-                    <SelectItem value="partial">Partly open</SelectItem>
-                    <SelectItem value="open">Open</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dam-notes">Field notes</Label>
-                <Textarea
-                  id="dam-notes"
-                  rows={3}
-                  placeholder="e.g. Increased evening release after upstream storms…"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dam-reporter">Reporter (optional)</Label>
-                <Input
-                  id="dam-reporter"
-                  placeholder="Name or desk role"
-                  value={reporter}
-                  onChange={(e) => setReporter(e.target.value)}
-                />
-              </div>
-              <Button type="submit" className="w-full font-bold" disabled={submitting}>
-                {submitting ? "Saving…" : "Save & improve prediction"}
-              </Button>
-            </form>
+                  <Bar dataKey="mm" name="Rain (mm)" fill="var(--chart-2)" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </DeskCard>
 
-          <DeskCard>
-            <DeskCardHeader
-              title="Recent operator reports"
-              description="Fresh entries (under 48h) are blended 55% with the rain model."
-            />
-            {obsLoading ? (
-              <p className="mt-4 text-sm text-muted-foreground">Loading reports…</p>
-            ) : observations.length === 0 ? (
-              <p className="mt-4 text-sm text-muted-foreground">
-                No manual reports yet. Add one when you get word from the dam operator or a field
-                team.
-              </p>
-            ) : (
-              <ul className="mt-4 space-y-3">
-                {observations.map((o) => (
-                  <li
-                    key={o.id}
-                    className="rounded-lg border border-border/70 bg-dust/50 px-3 py-2.5 text-sm"
-                  >
-                    <p className="font-semibold">
-                      {new Date(o.created_at * 1000).toLocaleString()}
-                      {o.reporter ? ` · ${o.reporter}` : ""}
-                    </p>
-                    <p className="mt-1 text-muted-foreground">
-                      {[
-                        o.release_m3s != null ? `${o.release_m3s} m³/s` : null,
-                        o.fill_percent != null ? `${o.fill_percent}% full` : null,
-                        o.spillway_status ? spillwayLabel(o.spillway_status) : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || "Notes only"}
-                    </p>
-                    {o.notes ? <p className="mt-1 text-xs">{o.notes}</p> : null}
-                  </li>
-                ))}
-              </ul>
-            )}
+          <DeskCard padded={false}>
+            <div className="border-b border-border/80 px-5 py-4">
+              <DeskCardHeader
+                title="Pressure index vs rain"
+                description="7-day series — fill index and release proxy (not live SCADA)."
+              />
+            </div>
+            <div className="h-64 p-4">
+              {pressureSeries.length === 0 ? (
+                <p className="p-4 text-sm text-muted-foreground">No trend series yet.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={pressureSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="day" stroke="var(--muted-foreground)" fontSize={12} />
+                    <YAxis yAxisId="l" stroke="var(--muted-foreground)" fontSize={12} />
+                    <YAxis
+                      yAxisId="r"
+                      orientation="right"
+                      stroke="var(--muted-foreground)"
+                      fontSize={12}
+                      domain={[40, 100]}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: "var(--popover)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 8,
+                      }}
+                    />
+                    <Legend />
+                    <Line
+                      yAxisId="l"
+                      type="monotone"
+                      dataKey="rainMm"
+                      name="Rain mm"
+                      stroke="var(--chart-2)"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <Line
+                      yAxisId="r"
+                      type="monotone"
+                      dataKey="fillIndex"
+                      name="Fill index %"
+                      stroke="var(--chart-1)"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </div>
           </DeskCard>
         </div>
 
         <DeskCard>
           <DeskCardHeader
-            title="Live risk context"
-            description="Dam signal alone and combined with rain."
+            title="Honest labels"
+            description="This page is dam-only. Compound collision lives on its own page."
           />
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <DeskMetric label="Turbines / SCADA" value="Not live" note={dam.turbineStatus} />
-            <DeskMetric
-              label="Dam-only risk"
-              value={damTrigger.label}
-              note={`Arrival ~${damTrigger.etaHours ?? "—"} hours`}
-            />
-            <DeskMetric
-              label="Compound with rain"
-              value={data.compoundTrigger.tier}
-              note={data.risk?.compound_active ? "Collision window OPEN" : "No collision window"}
-            />
-            <DeskMetric
-              label="GloFAS discharge"
-              value={
-                data.glofasForecast?.dischargeForecast != null
-                  ? `${data.glofasForecast.dischargeForecast} m³/s`
-                  : "—"
-              }
-              note={data.glofasForecast?.honesty ?? "Best-effort river model"}
-            />
-            <DeskMetric
-              label="Calibrated flood score"
-              value={
-                data.trainedRisk?.floodProbability != null
-                  ? `${Math.round(data.trainedRisk.floodProbability * 100)}%`
-                  : "—"
-              }
-              note="Downstream catchment corroboration"
-            />
-            <DeskMetric
-              label="Storage (estimate)"
-              value={`${dam.liveStorageBcm} BCM`}
-              note={`~${dam.waterLevelMasl} m ASL (proxy)`}
-            />
-          </div>
-        </DeskCard>
-
-        {data.trend.length > 0 && (
-          <DeskCard padded={false}>
-            <div className="border-b border-border/80 px-5 py-4 sm:px-6">
-              <DeskCardHeader
-                title="7-day pressure trend"
-                description="Reservoir index tracks rain + release proxy — not SCADA fill."
-              />
-            </div>
-            <div className="px-2 pb-4 pt-2 sm:px-4">
-              <TrendChart data={data.trend} />
-            </div>
-          </DeskCard>
-        )}
-
-        <DeskCard>
-          <DeskCardHeader
-            title="Sensor roadmap"
-            description="Designed for live hardware when partners connect."
-          />
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <SensorSlot
-              icon={Satellite}
-              label="Reservoir level"
-              status="Planned"
-              note="Ultrasonic / pressure sensor at full supply datum"
-            />
-            <SensorSlot
-              icon={Activity}
-              label="Spillway gates"
-              status="Planned"
-              note="Gate position + overflow camera feed"
-            />
-            <SensorSlot
-              icon={Radio}
-              label="Turbine discharge"
-              status="Planned"
-              note="SCADA m³/s replaces rain proxy when live"
-            />
-          </div>
-          <p className="mt-4 text-sm text-muted-foreground">
-            Until sensors land: set{" "}
-            <code className="text-xs">DAM_TELEMETRY_URL</code> on the engine (
-            {engineBaseUrl()}) for partner JSON feeds, or use operator reports above. Quality
-            upgrades to <strong className="text-foreground">live_feed</strong> when a partner URL
-            returns <code className="text-xs">release_m3s</code>.
-          </p>
-        </DeskCard>
-
-        <DeskCard>
-          <DeskCardHeader title="What this means" />
-          <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
+          <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
             <li>
-              <strong className="text-foreground">Yes — we predict</strong> release and reservoir
-              pressure from rain, forecast, soil trend, and your manual reports.
+              No public Gibe III SCADA — numbers are estimated unless a partner feed or phone report
+              is blended in.
             </li>
             <li>
-              Labels stay honest: <strong className="text-foreground">estimated</strong> (model),{" "}
-              <strong className="text-foreground">manual</strong> (operator),{" "}
-              <strong className="text-foreground">partner</strong> (telemetry URL), future{" "}
-              <strong className="text-foreground">sensor</strong>.
+              Log operator reports via{" "}
+              <Link to="/phone" className="font-bold text-primary">
+                Phone / USSD desk
+              </Link>
+              .
             </li>
             <li>
-              Compare with the{" "}
-              <Link to="/rain" className="font-bold text-primary">
-                Rain page
-              </Link>{" "}
-              — Home uses both for the traffic light.
+              See rain + dam together on{" "}
+              <Link to="/compound" className="font-bold text-primary">
+                Compound risk
+              </Link>
+              .
             </li>
           </ul>
         </DeskCard>
       </div>
     </AppShell>
-  );
-}
-
-function PointerFallback({
-  label,
-  value,
-  source = "estimated",
-}: {
-  label: string;
-  value: string;
-  source?: DamPointerSource;
-}) {
-  return (
-    <li className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0">
-      <p className="text-sm font-semibold">{label}</p>
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-bold tabular-nums">{value}</span>
-        <span
-          className={cn(
-            "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
-            sourceBadge[source],
-          )}
-        >
-          {source}
-        </span>
-      </div>
-    </li>
-  );
-}
-
-function SensorSlot({
-  icon: Icon,
-  label,
-  status,
-  note,
-}: {
-  icon: typeof Satellite;
-  label: string;
-  status: string;
-  note: string;
-}) {
-  return (
-    <div className="rounded-xl border border-dashed border-border bg-background/60 px-4 py-3">
-      <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
-        <p className="text-sm font-bold">{label}</p>
-      </div>
-      <p className="mt-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-        {status}
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground">{note}</p>
-    </div>
   );
 }

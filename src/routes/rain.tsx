@@ -99,19 +99,21 @@ function RainPage() {
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <CatchmentForecastBlock
               title="Upstream — Gibe III basin"
-              subtitle="Same area as live 24h / 7d metrics"
+              subtitle="Catchment feeding the reservoir (inflow / fill-rate)"
               forecast3d={upstream?.forecast_rainfall?.next3_day}
               forecast7d={upstream?.forecast_rainfall?.next7_day}
               outlook={upstream?.risk_outlook}
               soilTrend={upstream?.soil_moisture?.trend}
+              soilRole="inflow"
             />
             <CatchmentForecastBlock
               title="Downstream — Omo / Turkana edge"
-              subtitle="Feeds trained flood probability + community outlook"
+              subtitle="Flood impact severity once water arrives (not dam structure)"
               forecast3d={downstream?.forecast_rainfall?.next3_day}
               forecast7d={downstream?.forecast_rainfall?.next7_day}
               outlook={downstream?.risk_outlook}
               soilTrend={downstream?.soil_moisture?.trend}
+              soilRole="impact"
               highlight
             />
           </div>
@@ -155,13 +157,14 @@ function RainPage() {
         <DeskCard>
           <DeskCardHeader title="What this means" />
           <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
-            <li>Heavy 24h rain on wet soils means water reaches the Omo faster.</li>
+            <li>Heavy 24h rain on wet soils means water reaches the Omo faster (downstream soil = flood-impact severity).</li>
             <li>
               Check the{" "}
               <Link to="/dam" className="font-bold text-primary">
                 Dam page
               </Link>{" "}
-              — estimated release pressure updates from this same live rain.
+              — estimated operational release pressure updates from upstream rain + catchment soil
+              (inflow / fill-rate), not dam structural sensors.
             </li>
           </ul>
         </DeskCard>
@@ -177,6 +180,7 @@ function CatchmentForecastBlock({
   forecast7d,
   outlook,
   soilTrend,
+  soilRole,
   highlight,
 }: {
   title: string;
@@ -185,8 +189,15 @@ function CatchmentForecastBlock({
   forecast7d?: number;
   outlook?: "Rising" | "Stable" | "Falling";
   soilTrend?: string;
+  soilRole?: "inflow" | "impact";
   highlight?: boolean;
 }) {
+  const soilLabel =
+    soilRole === "inflow"
+      ? "Soil · reservoir inflow"
+      : soilRole === "impact"
+        ? "Soil · flood impact"
+        : "Soil moisture";
   return (
     <div
       className={cn(
@@ -213,7 +224,9 @@ function CatchmentForecastBlock({
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {outlook && <OutlookBadge outlook={outlook} />}
         {soilTrend && (
-          <span className="text-xs text-muted-foreground">Soil moisture {soilTrend}</span>
+          <span className="text-xs text-muted-foreground">
+            {soilLabel} {soilTrend}
+          </span>
         )}
       </div>
     </div>
