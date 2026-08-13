@@ -20,6 +20,8 @@ def brief_script(
     ward_id: str | None = None,
     lang: str = "en",
     sector: str | None = None,
+    audience: str = "farmer",
+    include_audio: bool = True,
 ) -> dict[str, Any]:
     signals = _live()
     risk = signals.get("risk") or {}
@@ -32,29 +34,73 @@ def brief_script(
     place = (props or {}).get("name") or ward_id or "the basin"
     sec = sector or (props or {}).get("sector_default") or "pastoralist"
     play = get_playbook_line(sec, tier, lang if lang in ("en", "sw", "trk", "orm", "am") else "en")
+    for_organizer = str(audience or "").lower() in ("organizer", "officer", "desk", "ngo")
+
+    why = ""
+    try:
+        from services import climatic_impact as ci
+
+        state = signals.get("climatic_state") or "flood_rain"
+        why = ci.sms_why_clause(str(state), "crops").replace("Reason: ", "")
+        if len(why) > 80:
+            why = why[:77].rstrip() + "."
+    except Exception:
+        why = ""
 
     if lang == "sw":
-        text = (
-            f"ALMA helpline. {place}. Hali ya mafuriko {tier}. "
-            f"Mvua juu {rain_mm} millimita. "
-            f"Hatua: {play}"
-        )
+        if for_organizer:
+            text = (
+                f"Habari, mimi ni Alma, wakala wa Early Action. "
+                f"Muhtasari wa {place}: hatari {tier}. "
+                f"Mvua juu {rain_mm} millimita kwa saa 24. "
+                f"Shinikizo la bwawa karibu {release:.0f} mita za ujazo kwa sekunde. "
+                + (f"Sababu: {why}. " if why else "")
+                + f"Hatua ya sasa: {play}"
+            )
+        else:
+            text = (
+                f"Habari, mimi ni Alma. {place}. Hali ya mafuriko {tier}. "
+                f"Mvua juu {rain_mm} millimita. "
+                + (f"Sababu: {why}. " if why else "")
+                + f"Hatua: {play}"
+            )
     else:
-        text = (
-            f"ALMA voice agent. {place}. Flood level {tier}. "
-            f"Upstream rain {rain_mm} millimeters in 24 hours. "
-            f"Estimated dam pressure {release:.0f} cubic meters per second. "
-            f"What to do now: {play}"
-        )
+        if for_organizer:
+            text = (
+                f"Hello, I'm Alma, your Early Action voice agent. "
+                f"Officer brief for {place}: flood level {tier}. "
+                f"Upstream rain {rain_mm} millimeters in 24 hours. "
+                f"Estimated dam pressure {release:.0f} cubic meters per second. "
+                + (f"Why it matters: {why}. " if why else "")
+                + f"What to do now: {play}"
+            )
+        else:
+            text = (
+                f"Hello, I'm Alma. {place}. Flood level {tier}. "
+                f"Upstream rain {rain_mm} millimeters in 24 hours. "
+                f"Estimated dam pressure {release:.0f} cubic meters per second. "
+                + (f"Why it matters: {why}. " if why else "")
+                + f"What to do now: {play}"
+            )
 
     # Keep phone TTS short
     text = " ".join(text.split())
-    if len(text) > 320:
-        text = text[:317].rstrip() + "."
+    if len(text) > 360:
+        text = text[:357].rstrip() + "."
 
-    audio = elevenlabs_tts.synthesize(text)
+    if include_audio:
+        audio = elevenlabs_tts.synthesize(text)
+    else:
+        audio = {
+            "ok": False,
+            "mode": "text_only",
+            "note": "Audio skipped for fast desk brief — tap Ask Alma to hear voice",
+        }
+
     return {
         "ok": True,
+        "agent": "Alma",
+        "audience": "organizer" if for_organizer else "farmer",
         "ward_id": ward_id,
         "place": place,
         "tier": tier,
@@ -63,7 +109,7 @@ def brief_script(
         "text": text,
         "rain_mm": rain_mm,
         "release_m3s": release,
-        "audio_url": audio.get("url") if audio.get("ok") else None,
+        "audio_url": elevenlabs_tts.desk_audio_url(audio),
         "tts_mode": audio.get("mode") or ("demo" if not audio.get("ok") else "live"),
         "tts_note": audio.get("note") or audio.get("error"),
     }
@@ -72,16 +118,20 @@ def brief_script(
 def helpline_menu_script(lang: str = "sw") -> str:
     if lang == "en":
         return (
-            "Welcome to ALMA farmer helpline. "
+            "Hello, I'm Alma from ALMA Early Action. "
             "Press 1 for live flood risk. "
             "Press 2 for what to do now. "
             "Press 3 to leave a river report. "
+            "Press 6 for after-event readiness. "
+            "Press 5 to talk to me freely. "
             "Press 4 to hear this menu again."
         )
     return (
-        "Karibu ALMA helpline ya wakulima. "
+        "Habari, mimi ni Alma kutoka ALMA Early Action. "
         "Bonyeza 1 kwa hatari ya mafuriko. "
         "Bonyeza 2 kwa hatua za sasa. "
         "Bonyeza 3 kuripoti kiwango cha maji. "
+        "Bonyeza 6 kwa hatua baada ya tukio. "
+        "Bonyeza 5 kuzungumza nami. "
         "Bonyeza 4 kusikia menyu tena."
     )

@@ -1,6 +1,7 @@
 """
-WhatsApp dispatch — Meta / Twilio / Africa's Talking, then demo mode.
-Priority in auto: Meta → Twilio → Africa's Talking → demo.
+WhatsApp dispatch — Meta / Africa's Talking / Twilio, then demo mode.
+Priority in auto: Meta → Africa's Talking → Twilio → demo.
+(Twilio is optional leftover — this project primary stack is Meta + AT.)
 """
 from __future__ import annotations
 
@@ -12,10 +13,14 @@ import httpx
 
 from services import africastalking, twilio_dispatch
 
-WHATSAPP_PROVIDER = os.getenv("WHATSAPP_PROVIDER", "auto").lower()  # auto | meta | twilio | africastalking | demo
-META_WA_TOKEN = os.getenv("META_WA_TOKEN", "")
-META_WA_PHONE_NUMBER_ID = os.getenv("META_WA_PHONE_NUMBER_ID", "")
-META_WA_API_VERSION = os.getenv("META_WA_API_VERSION", "v21.0")
+
+def _meta_config() -> tuple[str, str, str]:
+    """Read Meta WhatsApp env at call time so token refreshes apply without stale imports."""
+    return (
+        (os.getenv("META_WA_TOKEN") or "").strip(),
+        (os.getenv("META_WA_PHONE_NUMBER_ID") or "").strip(),
+        (os.getenv("META_WA_API_VERSION") or "v21.0").strip(),
+    )
 
 
 def _normalize_msisdn(phone: str) -> str:
@@ -24,7 +29,8 @@ def _normalize_msisdn(phone: str) -> str:
 
 
 def send_meta(phone: str, message: str) -> dict[str, Any]:
-    if not META_WA_TOKEN or not META_WA_PHONE_NUMBER_ID:
+    token, phone_number_id, api_version = _meta_config()
+    if not token or not phone_number_id:
         return {
             "mode": "demo",
             "channel": "whatsapp",
@@ -35,10 +41,7 @@ def send_meta(phone: str, message: str) -> dict[str, Any]:
         }
 
     to = _normalize_msisdn(phone)
-    url = (
-        f"https://graph.facebook.com/{META_WA_API_VERSION}/"
-        f"{META_WA_PHONE_NUMBER_ID}/messages"
-    )
+    url = f"https://graph.facebook.com/{api_version}/{phone_number_id}/messages"
     payload = {
         "messaging_product": "whatsapp",
         "to": to,
@@ -49,7 +52,7 @@ def send_meta(phone: str, message: str) -> dict[str, Any]:
         res = client.post(
             url,
             headers={
-                "Authorization": f"Bearer {META_WA_TOKEN}",
+                "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json",
             },
             json=payload,
@@ -72,25 +75,26 @@ def send_meta(phone: str, message: str) -> dict[str, Any]:
 
 
 def send_whatsapp(phone: str, message: str) -> dict[str, Any]:
-    provider = WHATSAPP_PROVIDER
+    provider = (os.getenv("WHATSAPP_PROVIDER") or "auto").lower()
+    token, phone_number_id, _ = _meta_config()
     if provider == "auto":
-        if META_WA_TOKEN and META_WA_PHONE_NUMBER_ID:
+        if token and phone_number_id:
             provider = "meta"
+        elif os.getenv("AT_WHATSAPP_NUMBER") and os.getenv("AT_API_KEY"):
+            provider = "africastalking"
         elif twilio_dispatch.whatsapp_available():
             provider = "twilio"
-        elif os.getenv("AT_WHATSAPP_NUMBER"):
-            provider = "africastalking"
         else:
             provider = "demo"
 
     if provider == "meta":
         return send_meta(phone, message)
-    if provider == "twilio":
-        return twilio_dispatch.send_whatsapp(phone, message)
     if provider == "africastalking":
         out = africastalking.send_whatsapp(phone, message)
         out["provider"] = "africastalking"
         return out
+    if provider == "twilio":
+        return twilio_dispatch.send_whatsapp(phone, message)
     return {
         "mode": "demo",
         "channel": "whatsapp",
@@ -98,7 +102,7 @@ def send_whatsapp(phone: str, message: str) -> dict[str, Any]:
         "to": phone,
         "message": message,
         "note": (
-            "WhatsApp demo — set Twilio (TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN + "
-            "TWILIO_WHATSAPP_FROM), Meta Cloud API, or AT_WHATSAPP_NUMBER."
+            "WhatsApp demo — set Meta Cloud API (META_WA_TOKEN + META_WA_PHONE_NUMBER_ID), "
+            "or AT_WHATSAPP_NUMBER + AT_API_KEY. Twilio is optional only."
         ),
     }

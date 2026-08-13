@@ -79,6 +79,14 @@ def init_db() -> None:
               last_received_at REAL NOT NULL,
               resent_count INTEGER NOT NULL DEFAULT 0,
               status TEXT NOT NULL DEFAULT 'new',
+              escalation_count INTEGER NOT NULL DEFAULT 0,
+              acknowledged_by TEXT,
+              acknowledged_at REAL,
+              resolved_at REAL,
+              check_in_response TEXT,
+              check_in_sent_at REAL,
+              reopened_at REAL,
+              reopen_reason TEXT,
               created_at REAL NOT NULL,
               updated_at REAL NOT NULL
             );
@@ -116,8 +124,70 @@ def init_db() -> None:
               compound INTEGER NOT NULL DEFAULT 0,
               at REAL NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS ground_observers (
+              phone TEXT PRIMARY KEY,
+              profile_json TEXT NOT NULL DEFAULT '{}',
+              verified INTEGER NOT NULL DEFAULT 0,
+              updated_at REAL NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS ground_observer_reports (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              phone TEXT NOT NULL,
+              organization_id TEXT,
+              report_type TEXT NOT NULL,
+              value TEXT NOT NULL,
+              verified_observer INTEGER NOT NULL DEFAULT 0,
+              source TEXT,
+              raw_text TEXT,
+              needs_review INTEGER NOT NULL DEFAULT 0,
+              registered_location TEXT,
+              created_at REAL NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS app_settings (
+              key TEXT PRIMARY KEY,
+              value_json TEXT NOT NULL DEFAULT '{}',
+              updated_at REAL NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS ground_checks (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              phone TEXT NOT NULL,
+              channel TEXT NOT NULL,
+              sent_at REAL,
+              responded_at REAL,
+              timely INTEGER,
+              created_at REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_ground_checks_phone ON ground_checks(phone);
+            CREATE TABLE IF NOT EXISTS recovery_eligibility_audit (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              phone TEXT NOT NULL,
+              region_id TEXT,
+              flag INTEGER NOT NULL,
+              audit_json TEXT NOT NULL,
+              created_at REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_eligibility_phone ON recovery_eligibility_audit(phone);
             """
         )
+        _ensure_sos_columns(c)
+
+
+def _ensure_sos_columns(c: sqlite3.Connection) -> None:
+    """Migrate older sos_queue schemas forward without wiping data."""
+    cols = {str(r[1]) for r in c.execute("PRAGMA table_info(sos_queue)").fetchall()}
+    alters = [
+        ("escalation_count", "INTEGER NOT NULL DEFAULT 0"),
+        ("acknowledged_by", "TEXT"),
+        ("acknowledged_at", "REAL"),
+        ("resolved_at", "REAL"),
+        ("check_in_response", "TEXT"),
+        ("check_in_sent_at", "REAL"),
+        ("reopened_at", "REAL"),
+        ("reopen_reason", "TEXT"),
+    ]
+    for name, typ in alters:
+        if name not in cols:
+            c.execute(f"ALTER TABLE sos_queue ADD COLUMN {name} {typ}")
 
 
 def get_session(session_id: str) -> dict[str, Any] | None:
@@ -180,6 +250,11 @@ def add_ground_truth(phone: str | None, ward_id: str | None, parsed: dict[str, A
                     (ward_id, weight, 1, time.time()),
                 )
     log_action(phone, ward_id, "ground_truth", parsed)
+    if phone:
+        try:
+            record_ground_check_response(str(phone), "ground_truth")
+        except Exception:
+            pass
 
 
 def community_score(ward_id: str) -> dict[str, Any]:
@@ -406,29 +481,167 @@ def log_sos_request(
 
 
 def list_sos_queue(limit: int = 50, *, include_resolved: bool = False) -> list[dict[str, Any]]:
+    """
+    Default open queue excludes resolved (including pending check-in).
+    Escalation tick uses include_resolved=True to see check-in silence.
+    """
+    order = """
+      ORDER BY
+        CASE status
+          WHEN 'reopened' THEN 0
+          WHEN 'new' THEN 1
+          WHEN 'being_handled' THEN 2
+          ELSE 3
+        END,
+        last_received_at DESC
+      LIMIT ?
+    """
     with _conn() as c:
         if include_resolved:
-            rows = c.execute(
-                "SELECT * FROM sos_queue ORDER BY last_received_at DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
+            rows = c.execute(f"SELECT * FROM sos_queue {order}", (limit,)).fetchall()
         else:
             rows = c.execute(
-                "SELECT * FROM sos_queue WHERE status!='resolved' ORDER BY last_received_at DESC LIMIT ?",
+                f"SELECT * FROM sos_queue WHERE status!='resolved' {order}",
                 (limit,),
             ).fetchall()
     return [dict(r) for r in rows]
 
 
-def set_sos_status(sos_id: int, status: str) -> dict[str, Any] | None:
+def get_sos(sos_id: int) -> dict[str, Any] | None:
+    with _conn() as c:
+        row = c.execute("SELECT * FROM sos_queue WHERE id=?", (int(sos_id),)).fetchone()
+    return dict(row) if row else None
+
+
+def get_sos_pending_checkin(phone: str) -> dict[str, Any] | None:
+    phone = (phone or "").strip()
+    if not phone:
+        return None
+    with _conn() as c:
+        row = c.execute(
+            """
+            SELECT * FROM sos_queue
+            WHERE phone=? AND status='resolved' AND check_in_response='pending'
+            ORDER BY check_in_sent_at DESC
+            LIMIT 1
+            """,
+            (phone,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def set_sos_status(
+    sos_id: int,
+    status: str,
+    *,
+    acknowledged_by: str | None = None,
+    trigger_checkin: bool = False,
+) -> dict[str, Any] | None:
     status = str(status or "").strip().lower()
-    if status not in ("new", "being_handled", "resolved"):
+    if status not in ("new", "being_handled", "resolved", "reopened"):
         return None
     now = time.time()
     with _conn() as c:
+        row = c.execute("SELECT * FROM sos_queue WHERE id=?", (int(sos_id),)).fetchone()
+        if not row:
+            return None
+        existing = dict(row)
+        ack_by = acknowledged_by or existing.get("acknowledged_by")
+        ack_at = existing.get("acknowledged_at")
+        resolved_at = existing.get("resolved_at")
+        check_in = existing.get("check_in_response")
+        check_in_sent = existing.get("check_in_sent_at")
+
+        if status == "being_handled":
+            ack_by = acknowledged_by or "desk_operator"
+            ack_at = now
+        if status == "resolved":
+            resolved_at = now
+            if trigger_checkin:
+                check_in = "pending"
+                check_in_sent = now
+
         c.execute(
-            "UPDATE sos_queue SET status=?, updated_at=? WHERE id=?",
-            (status, now, int(sos_id)),
+            """
+            UPDATE sos_queue
+            SET status=?, updated_at=?, acknowledged_by=?, acknowledged_at=?,
+                resolved_at=?, check_in_response=?, check_in_sent_at=?
+            WHERE id=?
+            """,
+            (
+                status,
+                now,
+                ack_by,
+                ack_at,
+                resolved_at,
+                check_in,
+                check_in_sent,
+                int(sos_id),
+            ),
+        )
+        updated = c.execute("SELECT * FROM sos_queue WHERE id=?", (int(sos_id),)).fetchone()
+    return dict(updated) if updated else None
+
+
+def set_sos_checkin(sos_id: int, response: str) -> dict[str, Any] | None:
+    """response: yes | no | no_reply"""
+    response = str(response or "").strip().lower()
+    if response not in ("yes", "no", "no_reply"):
+        return None
+    now = time.time()
+    with _conn() as c:
+        # YES closes the case; NO/silence reopen is handled by reopen_sos
+        status = "resolved" if response == "yes" else None
+        if status:
+            c.execute(
+                """
+                UPDATE sos_queue
+                SET check_in_response=?, updated_at=?, status=?
+                WHERE id=?
+                """,
+                (response, now, status, int(sos_id)),
+            )
+        else:
+            c.execute(
+                """
+                UPDATE sos_queue
+                SET check_in_response=?, updated_at=?
+                WHERE id=?
+                """,
+                (response, now, int(sos_id)),
+            )
+        row = c.execute("SELECT * FROM sos_queue WHERE id=?", (int(sos_id),)).fetchone()
+    return dict(row) if row else None
+
+
+def reopen_sos(sos_id: int, *, reason: str) -> dict[str, Any] | None:
+    now = time.time()
+    reason = str(reason or "no")[:80]
+    check_in = "no_reply" if reason == "no_reply" else "no"
+    with _conn() as c:
+        c.execute(
+            """
+            UPDATE sos_queue
+            SET status='reopened', reopened_at=?, reopen_reason=?,
+                check_in_response=?, updated_at=?, last_received_at=?
+            WHERE id=?
+            """,
+            (now, reason, check_in, now, now, int(sos_id)),
+        )
+        row = c.execute("SELECT * FROM sos_queue WHERE id=?", (int(sos_id),)).fetchone()
+    return dict(row) if row else None
+
+
+def bump_sos_escalation(sos_id: int) -> dict[str, Any] | None:
+    now = time.time()
+    with _conn() as c:
+        c.execute(
+            """
+            UPDATE sos_queue
+            SET escalation_count=COALESCE(escalation_count,0)+1, updated_at=?
+            WHERE id=?
+            """,
+            (now, int(sos_id)),
         )
         row = c.execute("SELECT * FROM sos_queue WHERE id=?", (int(sos_id),)).fetchone()
     return dict(row) if row else None
@@ -613,3 +826,452 @@ def list_recovery_interest(limit: int = 50) -> list[dict[str, Any]]:
             (limit,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+ACK_WINDOW_S = 24 * 3600
+
+
+def record_ground_check_sent(phone: str, channel: str = "sms") -> int:
+    """IVR/SMS ground check dispatched to a community member."""
+    now = time.time()
+    with _conn() as c:
+        cur = c.execute(
+            """
+            INSERT INTO ground_checks(phone, channel, sent_at, created_at)
+            VALUES(?,?,?,?)
+            """,
+            (phone, channel, now, now),
+        )
+        return int(cur.lastrowid)
+
+
+def record_ground_check_response(phone: str, channel: str = "ussd", within_s: float = ACK_WINDOW_S) -> bool:
+    """Mark the latest unmatched check as responded (timely if within window)."""
+    now = time.time()
+    with _conn() as c:
+        row = c.execute(
+            """
+            SELECT id, sent_at FROM ground_checks
+            WHERE phone=? AND responded_at IS NULL
+            ORDER BY created_at DESC LIMIT 1
+            """,
+            (phone,),
+        ).fetchone()
+        if not row:
+            return False
+        sent_at = float(row["sent_at"] or now)
+        timely = 1 if (now - sent_at) <= within_s else 0
+        c.execute(
+            """
+            UPDATE ground_checks
+            SET responded_at=?, timely=?
+            WHERE id=?
+            """,
+            (now, timely, row["id"]),
+        )
+        return True
+
+
+def verification_stats(phone: str) -> dict[str, int]:
+    with _conn() as c:
+        sent = c.execute(
+            "SELECT COUNT(*) AS n FROM ground_checks WHERE phone=? AND sent_at IS NOT NULL",
+            (phone,),
+        ).fetchone()["n"]
+        timely = c.execute(
+            "SELECT COUNT(*) AS n FROM ground_checks WHERE phone=? AND timely=1",
+            (phone,),
+        ).fetchone()["n"]
+        responded = c.execute(
+            "SELECT COUNT(*) AS n FROM ground_checks WHERE phone=? AND responded_at IS NOT NULL",
+            (phone,),
+        ).fetchone()["n"]
+    return {
+        "checks_sent": int(sent or 0),
+        "timely_responses": int(timely or 0),
+        "responded": int(responded or 0),
+    }
+
+
+def count_ground_truth_for_phone(phone: str) -> int:
+    with _conn() as c:
+        row = c.execute(
+            "SELECT COUNT(*) AS n FROM ground_truth WHERE phone=?",
+            (phone,),
+        ).fetchone()
+    return int(row["n"] or 0) if row else 0
+
+
+def save_eligibility_audit(phone: str, audit: dict[str, Any]) -> None:
+    with _conn() as c:
+        c.execute(
+            """
+            INSERT INTO recovery_eligibility_audit(phone, region_id, flag, audit_json, created_at)
+            VALUES(?,?,?,?,?)
+            """,
+            (
+                phone,
+                audit.get("region_id"),
+                1 if audit.get("recovery_eligibility_flag") else 0,
+                json.dumps(audit),
+                time.time(),
+            ),
+        )
+
+
+def latest_eligibility_audit(phone: str) -> dict[str, Any] | None:
+    with _conn() as c:
+        row = c.execute(
+            """
+            SELECT audit_json FROM recovery_eligibility_audit
+            WHERE phone=? ORDER BY created_at DESC LIMIT 1
+            """,
+            (phone,),
+        ).fetchone()
+    if not row:
+        return None
+    try:
+        return json.loads(row["audit_json"])
+    except json.JSONDecodeError:
+        return None
+
+
+# --- Ground observers + ICPAC settings ---
+
+def upsert_ground_observer(profile: dict[str, Any]) -> dict[str, Any]:
+    phone = str(profile.get("phoneNumber") or profile.get("phone") or "").strip()
+    if not phone:
+        raise ValueError("observer phone required")
+    now = time.time()
+    existing = get_ground_observer(phone)
+    merged = {**(existing or {}), **profile, "phoneNumber": phone, "updatedAt": now}
+    if "createdAt" not in merged:
+        merged["createdAt"] = now
+    verified = 1 if merged.get("verified") else 0
+    with _conn() as c:
+        c.execute(
+            """
+            INSERT INTO ground_observers(phone, profile_json, verified, updated_at) VALUES(?,?,?,?)
+            ON CONFLICT(phone) DO UPDATE SET
+              profile_json=excluded.profile_json,
+              verified=excluded.verified,
+              updated_at=excluded.updated_at
+            """,
+            (phone, json.dumps(merged), verified, now),
+        )
+    return merged
+
+
+def get_ground_observer(phone: str) -> dict[str, Any] | None:
+    with _conn() as c:
+        row = c.execute(
+            "SELECT profile_json, verified FROM ground_observers WHERE phone=?",
+            (phone,),
+        ).fetchone()
+    if not row:
+        return None
+    try:
+        data = json.loads(row["profile_json"] or "{}")
+    except json.JSONDecodeError:
+        return None
+    data["verified"] = bool(row["verified"] or data.get("verified"))
+    return data
+
+
+def set_ground_observer_verified(phone: str, verified: bool) -> dict[str, Any] | None:
+    row = get_ground_observer(phone)
+    if not row:
+        return None
+    row["verified"] = bool(verified)
+    return upsert_ground_observer(row)
+
+
+def list_ground_observers() -> list[dict[str, Any]]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT profile_json, verified FROM ground_observers ORDER BY updated_at DESC"
+        ).fetchall()
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        try:
+            data = json.loads(r["profile_json"] or "{}")
+            data["verified"] = bool(r["verified"] or data.get("verified"))
+            out.append(data)
+        except json.JSONDecodeError:
+            continue
+    return out
+
+
+def add_ground_observer_report(payload: dict[str, Any]) -> dict[str, Any]:
+    now = time.time()
+    with _conn() as c:
+        cur = c.execute(
+            """
+            INSERT INTO ground_observer_reports(
+              phone, organization_id, report_type, value, verified_observer,
+              source, raw_text, needs_review, registered_location, created_at
+            ) VALUES(?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                payload.get("phoneNumber"),
+                payload.get("organizationId"),
+                payload.get("reportType"),
+                payload.get("value"),
+                1 if payload.get("verifiedObserver") else 0,
+                payload.get("source"),
+                payload.get("rawText"),
+                1 if payload.get("needsReview") else 0,
+                payload.get("registeredLocation"),
+                now,
+            ),
+        )
+        row_id = int(cur.lastrowid)
+    return {
+        "id": row_id,
+        "phoneNumber": payload.get("phoneNumber"),
+        "organizationId": payload.get("organizationId"),
+        "reportType": payload.get("reportType"),
+        "value": payload.get("value"),
+        "verifiedObserver": bool(payload.get("verifiedObserver")),
+        "source": payload.get("source"),
+        "rawText": payload.get("rawText"),
+        "needsReview": bool(payload.get("needsReview")),
+        "registeredLocation": payload.get("registeredLocation"),
+        "createdAt": now,
+    }
+
+
+def list_ground_observer_reports(limit: int = 50) -> list[dict[str, Any]]:
+    with _conn() as c:
+        rows = c.execute(
+            """
+            SELECT * FROM ground_observer_reports
+            ORDER BY created_at DESC LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    out = []
+    for r in rows:
+        out.append(
+            {
+                "id": r["id"],
+                "phoneNumber": r["phone"],
+                "organizationId": r["organization_id"],
+                "reportType": r["report_type"],
+                "value": r["value"],
+                "verifiedObserver": bool(r["verified_observer"]),
+                "source": r["source"],
+                "rawText": r["raw_text"],
+                "needsReview": bool(r["needs_review"]),
+                "registeredLocation": r["registered_location"],
+                "createdAt": r["created_at"],
+            }
+        )
+    return out
+
+
+def get_app_setting(key: str) -> dict[str, Any] | None:
+    with _conn() as c:
+        row = c.execute(
+            "SELECT value_json FROM app_settings WHERE key=?",
+            (key,),
+        ).fetchone()
+    if not row:
+        return None
+    try:
+        return json.loads(row["value_json"] or "{}")
+    except json.JSONDecodeError:
+        return None
+
+
+def set_app_setting(key: str, value: dict[str, Any]) -> None:
+    with _conn() as c:
+        c.execute(
+            """
+            INSERT INTO app_settings(key, value_json, updated_at) VALUES(?,?,?)
+            ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at
+            """,
+            (key, json.dumps(value), time.time()),
+        )
+
+
+# --- Voice / Alma conversation sessions (IVR + desk sim) ---
+
+MAX_VOICE_QA_TURNS = 4
+
+
+def _ensure_voice_conv_table(c: sqlite3.Connection) -> None:
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS voice_conversations (
+          session_id TEXT PRIMARY KEY,
+          phone TEXT,
+          ward_id TEXT,
+          lang TEXT,
+          sector TEXT,
+          state TEXT NOT NULL,
+          turn_count INTEGER NOT NULL DEFAULT 0,
+          conversation_json TEXT NOT NULL DEFAULT '[]',
+          scripted_guidance TEXT,
+          started_at REAL NOT NULL,
+          updated_at REAL NOT NULL
+        )
+        """
+    )
+
+
+def save_voice_conversation(
+    session_id: str,
+    *,
+    phone: str = "",
+    ward_id: str | None = None,
+    lang: str = "sw",
+    sector: str | None = None,
+    state: str = "menu",
+    turn_count: int = 0,
+    conversation_context: list | None = None,
+    scripted_guidance: str | None = None,
+    started_at: float | None = None,
+) -> dict[str, Any]:
+    now = time.time()
+    sid = (session_id or "").strip() or f"voice-{secrets.token_hex(6)}"
+    with _conn() as c:
+        _ensure_voice_conv_table(c)
+        existing = c.execute(
+            "SELECT started_at FROM voice_conversations WHERE session_id=?", (sid,)
+        ).fetchone()
+        start = float(started_at or (existing["started_at"] if existing else now))
+        c.execute(
+            """
+            INSERT INTO voice_conversations(
+              session_id, phone, ward_id, lang, sector, state, turn_count,
+              conversation_json, scripted_guidance, started_at, updated_at
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(session_id) DO UPDATE SET
+              phone=excluded.phone,
+              ward_id=excluded.ward_id,
+              lang=excluded.lang,
+              sector=excluded.sector,
+              state=excluded.state,
+              turn_count=excluded.turn_count,
+              conversation_json=excluded.conversation_json,
+              scripted_guidance=excluded.scripted_guidance,
+              updated_at=excluded.updated_at
+            """,
+            (
+                sid,
+                phone,
+                ward_id,
+                lang,
+                sector,
+                state,
+                int(turn_count),
+                json.dumps(conversation_context or []),
+                scripted_guidance,
+                start,
+                now,
+            ),
+        )
+    return get_voice_conversation(sid) or {
+        "session_id": sid,
+        "phone": phone,
+        "ward_id": ward_id,
+        "lang": lang,
+        "sector": sector,
+        "state": state,
+        "turn_count": turn_count,
+        "conversation_context": conversation_context or [],
+        "scripted_guidance": scripted_guidance,
+        "started_at": start,
+    }
+
+
+def get_voice_conversation(session_id: str) -> dict[str, Any] | None:
+    sid = (session_id or "").strip()
+    if not sid:
+        return None
+    with _conn() as c:
+        _ensure_voice_conv_table(c)
+        row = c.execute(
+            "SELECT * FROM voice_conversations WHERE session_id=?", (sid,)
+        ).fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    try:
+        ctx = json.loads(d.pop("conversation_json") or "[]")
+    except json.JSONDecodeError:
+        ctx = []
+    return {
+        "session_id": d["session_id"],
+        "phone": d.get("phone"),
+        "ward_id": d.get("ward_id"),
+        "lang": d.get("lang"),
+        "sector": d.get("sector"),
+        "state": d.get("state"),
+        "turn_count": int(d.get("turn_count") or 0),
+        "conversation_context": ctx,
+        "scripted_guidance": d.get("scripted_guidance"),
+        "started_at": d.get("started_at"),
+        "updated_at": d.get("updated_at"),
+    }
+
+
+def clear_voice_conversation(session_id: str) -> None:
+    sid = (session_id or "").strip()
+    if not sid:
+        return
+    with _conn() as c:
+        _ensure_voice_conv_table(c)
+        c.execute("DELETE FROM voice_conversations WHERE session_id=?", (sid,))
+
+
+def create_voice_outbound(
+    *,
+    phone: str,
+    ward_id: str,
+    community: str,
+    message: str,
+    sector: str,
+    lang: str,
+    tier: str,
+    client_request_id: str,
+) -> dict[str, Any]:
+    """Minimal outbound call queue row for voice_outbound service."""
+    now = time.time()
+    with _conn() as c:
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS voice_outbound (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              phone TEXT NOT NULL,
+              ward_id TEXT,
+              community TEXT,
+              message TEXT,
+              sector TEXT,
+              lang TEXT,
+              tier TEXT,
+              client_request_id TEXT,
+              at_session_id TEXT,
+              created_at REAL NOT NULL
+            )
+            """
+        )
+        c.execute(
+            """
+            INSERT INTO voice_outbound(
+              phone, ward_id, community, message, sector, lang, tier, client_request_id, created_at
+            ) VALUES(?,?,?,?,?,?,?,?,?)
+            """,
+            (phone, ward_id, community, message, sector, lang, tier, client_request_id, now),
+        )
+        oid = int(c.execute("SELECT last_insert_rowid()").fetchone()[0])
+    return {"id": oid, "client_request_id": client_request_id, "phone": phone}
+
+
+def bind_voice_session(outbound_id: int, at_session_id: str) -> None:
+    with _conn() as c:
+        c.execute(
+            "UPDATE voice_outbound SET at_session_id=? WHERE id=?",
+            (at_session_id, int(outbound_id)),
+        )

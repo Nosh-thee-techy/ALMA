@@ -245,6 +245,26 @@ def analyst_query(question: str, rain_mm: float, dam_m3s: float, risk: dict[str,
     }
 
 
+def voice_qa_answer(
+    question: str,
+    *,
+    community: str | None = None,
+    risk_context: dict[str, Any] | None = None,
+    conversation_context: list | None = None,
+    lang: str = "sw",
+) -> dict[str, Any]:
+    """Gemma Reasoning Guardrail — structured facts only; scripts on failure."""
+    from services.readiness_guardrail import voice_qa_answer as _bounded
+
+    return _bounded(
+        question,
+        community=community,
+        risk_context=risk_context,
+        conversation_context=conversation_context,
+        lang=lang,
+    )
+
+
 def health() -> dict[str, Any]:
     from services import featherless_ai
 

@@ -55,12 +55,14 @@ def build_community_guidance(community: str, region_id: str, message: str | None
     snap = gc.snapshot_from_live()
     st = snap["regions"].get(region_id) or snap["regions"]["turkana"]
     from services.live_signals import get_live_signals
+    from services import climatic_impact as ci
 
-    rain_eta = float((get_live_signals().get("risk") or {}).get("t_rain_arrival_h") or 24)
+    live = get_live_signals()
+    rain_eta = float((live.get("risk") or {}).get("t_rain_arrival_h") or 24)
     phase = st.get("event_phase") or "pre_risk"
     if phase == "post_risk":
         agri = gc.after_guidance("agriculture")
-        live = gc.after_guidance("livestock")
+        live_g = gc.after_guidance("livestock")
     else:
         agri = gc.before_guidance(
             "agriculture",
@@ -69,14 +71,19 @@ def build_community_guidance(community: str, region_id: str, message: str | None
             bool(st["compound_active"]),
             rain_eta,
         )
-        live = gc.before_guidance(
+        live_g = gc.before_guidance(
             "livestock",
             st["climate_state"],
             st["tier"],
             bool(st["compound_active"]),
             rain_eta,
         )
-    return f"ALMA {community}: Ag — {agri} Livestock — {live}"[:400]
+    state = live.get("climatic_state") or "flood_rain"
+    why = ci.sms_why_clause(str(state), "agriculture")
+    body = f"ALMA {community}: Ag — {agri} Livestock — {live_g}"
+    if why:
+        body = f"{body}. {why}"
+    return body[:400]
 
 
 def dispatch_to_community(
@@ -106,6 +113,10 @@ def dispatch_to_community(
             sms = (ch or {}).get("sms") or {}
             if sms.get("mode") in ("live", "demo"):
                 session_store.set_last_reached_via(ward, "SMS")
+            try:
+                session_store.record_ground_check_sent(phone, "sms")
+            except Exception:
+                pass
             # Voice branch: Warning/Severe/Compound + allowlist (test mode)
             # Voice calls are reserved for Warning/Severe/Compound only — do not call for
             # routine Watch-tier updates, this preserves trust and avoids alert fatigue.

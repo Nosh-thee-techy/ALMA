@@ -12,7 +12,7 @@ import time
 from typing import Any
 
 from services import africastalking, session_store
-from services.alert_copy import phase_alert, simple_alert
+from services.alert_copy import alert_with_why, simple_alert
 
 # Tier gate: Watch/Safe never dial — only actionable flood urgency.
 _VOICE_TIERS = frozenset({"warning", "severe"})
@@ -68,15 +68,14 @@ def alert_script(
     tier: str = "warning",
 ) -> str:
     """Same sector guidance text as SMS — spoken, not a second copy source."""
-    # Reuse Sector Guidance / SMS copy — do not invent a parallel voice script.
-    action = phase_alert(
-        sector=sector,
-        region_id=region_id,
-        lang=lang,
-        fallback_tier=tier,
-    )
-    if not action:
-        action = simple_alert(tier, lang)
+    action = simple_alert(tier, lang)
+    try:
+        from services import climatic_impact as ci
+
+        why = ci.sms_why_clause("flood_rise", sector if sector != "pastoralist" else "livestock")
+        action = alert_with_why(tier, why=why, lang=lang) or action
+    except Exception:
+        pass
     body = (
         f"This is ALMA. Water levels near {community} are rising fast. {action}"
     )
@@ -94,6 +93,7 @@ def trigger_outbound_alert(
     tier: str = "warning",
     compound_active: bool = False,
     voice_enabled: bool = True,
+    custom_script: str | None = None,
 ) -> dict[str, Any]:
     """
     Place an outbound AT voice call when severity + contact + allowlist allow it.
@@ -102,7 +102,8 @@ def trigger_outbound_alert(
     if not voice_enabled:
         return {"ok": False, "skipped": True, "reason": "voice_disabled_for_contact"}
 
-    if not tier_allows_voice(tier, compound_active=compound_active):
+    # SOS reopen scripts bypass the risk-tier gate (life-safety re-escalation).
+    if not custom_script and not tier_allows_voice(tier, compound_active=compound_active):
         return {
             "ok": False,
             "skipped": True,
@@ -130,7 +131,7 @@ def trigger_outbound_alert(
         }
 
     ward = ward_id or community.lower().replace(" ", "_")
-    script = alert_script(
+    script = (custom_script or "").strip() or alert_script(
         community=community,
         sector=sector,
         region_id=region_id,

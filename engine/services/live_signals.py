@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import httpx
@@ -24,6 +25,15 @@ from services.glofas_forecast import get_glofas_forecast_for_point
 
 _CACHE: dict[str, Any] = {"at": 0.0, "data": None}
 _CACHE_TTL_S = float(os.getenv("ALMA_LIVE_CACHE_S", "45"))
+# Keep Open-Meteo short — desk first paint must not wait on a slow upstream.
+_OPEN_METEO_TIMEOUT_S = float(os.getenv("ALMA_OPEN_METEO_TIMEOUT_S", "5.0"))
+# GloFAS/CDS is optional and often slow; default off for the hot live-signals path.
+_GLOFAS_ON_LIVE = os.getenv("ALMA_GLOFAS_ON_LIVE", "0").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 # Gibe III upstream basin (Ethiopia ΓÇö dam catchment)
 DAM_UPSTREAM_LAT = float(os.getenv("ALMA_OMO_LAT", "7.05"))
@@ -55,7 +65,7 @@ def _open_meteo_catchment(lat: float, lon: float) -> dict[str, Any]:
         f"?latitude={lat}&longitude={lon}"
         f"&{_FORECAST_PARAMS}"
     )
-    with httpx.Client(timeout=14.0) as client:
+    with httpx.Client(timeout=_OPEN_METEO_TIMEOUT_S) as client:
         res = client.get(url)
         res.raise_for_status()
         return res.json()
@@ -87,14 +97,8 @@ def _fetch_catchment(catchment_id: str, label: str, lat: float, lon: float) -> d
         }
 
 
-def _open_meteo_rain_mm() -> dict[str, Any]:
-    """Backward-compatible rain block ΓÇö dam upstream catchment fields preserved."""
-    upstream = _fetch_catchment(
-        "dam_upstream",
-        "Live Open-Meteo rain over Upper Omo (Gibe III upstream ΓÇö not gauge network)",
-        DAM_UPSTREAM_LAT,
-        DAM_UPSTREAM_LON,
-    )
+def _rain_from_upstream(upstream: dict[str, Any]) -> dict[str, Any]:
+    """Build the rain block from the dam-upstream catchment (no second HTTP call)."""
     return {
         "ok": upstream.get("ok", True) is not False,
         "source": "open-meteo",
@@ -104,7 +108,8 @@ def _open_meteo_rain_mm() -> dict[str, Any]:
         "rain_7d_mm": upstream.get("rain_7d_mm", 0.0),
         "daily_mm": upstream.get("daily_mm") or [],
         "dates": upstream.get("dates") or [],
-        "label": upstream.get("label"),
+        "label": upstream.get("label")
+        or "Live Open-Meteo rain over Upper Omo (Gibe III upstream — not gauge network)",
         "forecast_rainfall": upstream.get("forecast_rainfall"),
         "soil_moisture": upstream.get("soil_moisture"),
         "risk_outlook": upstream.get("risk_outlook"),
@@ -112,16 +117,31 @@ def _open_meteo_rain_mm() -> dict[str, Any]:
     }
 
 
+def _open_meteo_rain_mm() -> dict[str, Any]:
+    """Backward-compatible helper — prefer get_live_signals parallel path."""
+    upstream = _fetch_catchment(
+        "dam_upstream",
+        "Live Open-Meteo rain over Upper Omo (Gibe III upstream — not gauge network)",
+        DAM_UPSTREAM_LAT,
+        DAM_UPSTREAM_LON,
+    )
+    return _rain_from_upstream(upstream)
+
+
 def rain_to_release_pressure_m3s(rain_24h_mm: float, rain_7d_mm: float) -> dict[str, Any]:
     """
     Map upstream rain into an *estimated* Gibe-facing release pressure.
     This is NOT official dam discharge — labeled estimated_from_rain.
-    Heuristic: sustained wet weeks + heavy day → higher spill pressure.
+
+    Quiet periods stay near baseline turbine band so risk scoring (and therefore
+    before-guidance) only escalates when rain accumulation actually rises.
     """
-    day = min(rain_24h_mm, 120.0)
-    week = min(rain_7d_mm, 400.0)
-    # Baseline turbine band ~200–400; surge toward 1500+ under extreme rain
-    pressure = 180 + day * 8.5 + week * 1.2
+    day = min(max(0.0, rain_24h_mm), 120.0)
+    week = min(max(0.0, rain_7d_mm), 400.0)
+    # Baseline ~100 m³/s (routine generation). Surge toward 1500+ under extreme rain.
+    # Previous 180 baseline kept dam_score elevated even on dry days and made
+    # before-guidance look stuck on "evacuate" when live rain was light.
+    pressure = 100.0 + day * 9.0 + week * 1.35
     pressure = min(2200.0, max(80.0, pressure))
     return {
         "estimated_release_m3s": round(pressure, 1),
@@ -142,7 +162,7 @@ def fetch_partner_dam() -> dict[str, Any] | None:
     if DAM_TELEMETRY_TOKEN:
         headers["Authorization"] = f"Bearer {DAM_TELEMETRY_TOKEN}"
     try:
-        with httpx.Client(timeout=12.0) as client:
+        with httpx.Client(timeout=min(5.0, _OPEN_METEO_TIMEOUT_S + 1.0)) as client:
             res = client.get(DAM_TELEMETRY_URL, headers=headers)
             res.raise_for_status()
             body = res.json()
@@ -166,26 +186,31 @@ def get_live_signals(*, force: bool = False) -> dict[str, Any]:
     ):
         return _CACHE["data"]
 
-    dam_upstream = _fetch_catchment(
-        "dam_upstream",
-        "Gibe III upstream basin (Ethiopia)",
-        DAM_UPSTREAM_LAT,
-        DAM_UPSTREAM_LON,
-    )
-    downstream = _fetch_catchment(
-        "downstream",
-        "Downstream OmoΓÇôTurkana community catchment",
-        DOWNSTREAM_LAT,
-        DOWNSTREAM_LON,
-    )
+    # Parallel Open-Meteo (was sequential + a duplicate upstream fetch — multi-second stall).
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        fut_up = pool.submit(
+            _fetch_catchment,
+            "dam_upstream",
+            "Gibe III upstream basin (Ethiopia)",
+            DAM_UPSTREAM_LAT,
+            DAM_UPSTREAM_LON,
+        )
+        fut_down = pool.submit(
+            _fetch_catchment,
+            "downstream",
+            "Downstream Omo–Turkana community catchment",
+            DOWNSTREAM_LAT,
+            DOWNSTREAM_LON,
+        )
+        fut_partner = pool.submit(fetch_partner_dam)
+        dam_upstream = fut_up.result()
+        downstream = fut_down.result()
+        partner = fut_partner.result()
 
-    rain: dict[str, Any]
-    try:
-        rain = _open_meteo_rain_mm()
-    except Exception as exc:
+    rain = _rain_from_upstream(dam_upstream)
+    if rain.get("ok") is False and not rain.get("rain_24h_mm"):
         rain = {
-            "ok": False,
-            "error": str(exc),
+            **rain,
             "rain_24h_mm": 62.0,
             "rain_7d_mm": 240.0,
             "label": "Open-Meteo unavailable — fallback demo rain used",
@@ -195,7 +220,6 @@ def get_live_signals(*, force: bool = False) -> dict[str, Any]:
         float(rain.get("rain_24h_mm") or 0),
         float(rain.get("rain_7d_mm") or 0),
     )
-    partner = fetch_partner_dam()
 
     release = pressure["estimated_release_m3s"]
     data_quality = "estimated"
@@ -242,9 +266,26 @@ def get_live_signals(*, force: bool = False) -> dict[str, Any]:
     )
 
     # ---------------------------------------------------------------------
-    # Task 2: GloFAS enhancement (best-effort) ΓÇö time-boxed
+    # Task 2: GloFAS enhancement (optional — off by default on live path)
     # ---------------------------------------------------------------------
-    glofas = get_glofas_forecast_for_point(lat=float(downstream.get("lat") or DOWNSTREAM_LAT), lon=float(downstream.get("lon") or DOWNSTREAM_LON), now=dt.utcnow())
+    if _GLOFAS_ON_LIVE:
+        glofas = get_glofas_forecast_for_point(
+            lat=float(downstream.get("lat") or DOWNSTREAM_LAT),
+            lon=float(downstream.get("lon") or DOWNSTREAM_LON),
+            now=dt.utcnow(),
+        )
+    else:
+        from services.glofas_forecast import GloFASForecast
+
+        glofas = GloFASForecast(
+            ok=False,
+            source="skipped_on_live",
+            dischargeForecast=None,
+            exceedanceProbability=None,
+            forecastDate=dt.utcnow().date().isoformat(),
+            honesty="GloFAS skipped on live-signals for speed. Set ALMA_GLOFAS_ON_LIVE=1 to enable.",
+            error=None,
+        )
 
     # Only switch to glofas_enhanced if both discharge forecast and exceedance
     # probability are available.
@@ -275,7 +316,9 @@ def get_live_signals(*, force: bool = False) -> dict[str, Any]:
         tier=str(risk.tier),
         compound_active=bool(risk.compound_active),
         downstream_outlook=str(outlook.get("downstream_flood") or "Stable"),
-        dam_outlook=str(outlook.get("dam_overflow") or "Stable"),
+        dam_outlook=str(
+            outlook.get("dam_release_outlook") or outlook.get("dam_overflow") or "Stable"
+        ),
     )
 
     from services.dam_observations import build_dam_prediction
@@ -293,15 +336,47 @@ def get_live_signals(*, force: bool = False) -> dict[str, Any]:
     release = float(dam_prediction["release_m3s"])
     pressure = {**pressure, "estimated_release_m3s": round(release, 1)}
 
-    # Re-run compound risk with blended release (manual reports nudge dam score).
+    # ---------------------------------------------------------------------
+    # Ground Observer layer — structured human inputs (CBEWS principle via SMS/USSD)
+    # Verified reports weight higher; unverified stay labeled corroboration.
+    # Estimated (Open-Meteo / rain-proxy) remains a separate labeled layer.
+    # ---------------------------------------------------------------------
+    from services import ground_observers as go
+    from services import climatic_impact as ci
+    from services import icpac_outlook
+    from services import ground_conditions as gc_mod
+
+    observer_blend = go.recent_signal_blend()
+    rain_estimated = float(rain.get("rain_24h_mm") or 0)
+    rain_with_observers = max(0.0, rain_estimated + float(observer_blend.get("rain_mm_nudge") or 0))
+    release_estimated = float(release)
+    release_with_observers = max(
+        80.0, release_estimated + float(observer_blend.get("dam_m3s_nudge") or 0)
+    )
+
+    # Re-run compound risk with observer-weighted inputs (still transparent layers below).
     risk = compute_compound_risk(
-        float(rain.get("rain_24h_mm") or 0),
-        float(release),
+        rain_with_observers,
+        release_with_observers,
         data_quality=data_quality,
         ml_flood_probability=enhanced.floodProbability,
         ml_model_mode=enhanced.modelMode,
         ml_honesty=enhanced.honesty,
     )
+
+    # Climatic impact cascade state for desk + readiness
+    daily_mm = list(rain.get("daily_mm") or [])
+    climate = gc_mod.derive_climate(daily_mm)
+    drought = gc_mod.drought_risk(climate["climate_state"], int(climate.get("dry_days") or 0))
+    cascade_state = ci.resolve_climatic_state(
+        tier=str(risk.tier),
+        compound_active=bool(risk.compound_active),
+        climate_state=str(climate.get("climate_state") or "stable"),
+        rain_score=float(risk.rain_score),
+        dam_score=float(risk.dam_score),
+        drought_risk=drought,
+    )
+    cascade_ngo = ci.ngo_briefing(cascade_state)
 
     out = {
         "ok": True,
@@ -318,11 +393,36 @@ def get_live_signals(*, force: bool = False) -> dict[str, Any]:
         "risk": risk.to_dict(),
         "glofasForecast": glofas.to_dict(),
         "trainedRisk": enhanced.to_dict(),
+        "ground_observers": {
+            "layer": {
+                "estimated": {
+                    "rain_24h_mm": round(rain_estimated, 1),
+                    "dam_release_m3s": round(release_estimated, 1),
+                    "label": "Estimated",
+                },
+                "ground_verified": {
+                    "rain_mm_nudge": observer_blend.get("rain_mm_nudge"),
+                    "dam_m3s_nudge": observer_blend.get("dam_m3s_nudge"),
+                    "verified_report_count": observer_blend.get("verified_report_count"),
+                    "unverified_report_count": observer_blend.get("unverified_report_count"),
+                    "label": "Ground-Verified / corroboration",
+                },
+                "blended_for_risk": {
+                    "rain_24h_mm": round(rain_with_observers, 1),
+                    "dam_release_m3s": round(release_with_observers, 1),
+                },
+            },
+            "recent": observer_blend.get("reports") or [],
+            "honesty": observer_blend.get("honesty"),
+        },
+        "climatic_impact": cascade_ngo,
+        "climatic_state": cascade_state,
+        "icpac_regional_outlook": icpac_outlook.get_outlook(),
         "pitch_line": (
             "Live: upstream rain + predicted dam pressure (rain + forecast pointers, "
-            "optional operator reports) + forecast-informed outlook (Open-Meteo). "
-            "Includes a calibrated (non-deep) risk corroboration term; Gemma only "
-            "converts outputs to guidance."
+            "optional operator + ground-observer reports) + forecast-informed outlook. "
+            "Ground-Verified vs Estimated stay labeled. ICPAC outlook is manually curated. "
+            "Gemma only converts outputs to guidance."
         ),
     }
     _CACHE["at"] = now

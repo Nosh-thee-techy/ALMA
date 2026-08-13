@@ -1,0 +1,145 @@
+{
+  "_meta": {
+    "note": "Physical/economic cascade by climatic state for Omo–Turkana. NGO tier sees whatIsHappening + mechanism; farmer tier sees simplified whatIsHappening only. Region-specific crop/livestock detail can be refined with local reviewers.",
+    "audience": {
+      "farmer": "whatIsHappening (+ short whyItMatters)",
+      "ngo": "whatIsHappening + mechanism"
+    }
+  },
+  "flood_rain": {
+    "label": "Flood — rainfall driven",
+    "farmerIntro": "Heavy rain is raising flood risk in your area.",
+    "livestock": {
+      "whatIsHappening": "Rising water threatens grazing land and can cause drowning. Standing water increases risk of waterborne disease (e.g. liver fluke, foot rot) in livestock.",
+      "mechanism": "Submerged pasture forces herds into unfamiliar or crowded grazing areas, increasing disease transmission and stress-related productivity loss (reduced milk yield).",
+      "farmerWhy": "Your animals may lose safe grazing and get sick from standing water."
+    },
+    "crops": {
+      "whatIsHappening": "Waterlogged soil deprives plant roots of oxygen, causing root rot and crop death within days if prolonged. Standing water also promotes fungal disease.",
+      "mechanism": "Saturated soil pores fill with water, cutting off oxygen to root systems; most staple crops (maize, sorghum) cannot survive more than 2–4 days of full waterlogging during active growth stages.",
+      "farmerWhy": "Your crops can die if fields stay underwater for a few days."
+    },
+    "soil": {
+      "whatIsHappening": "Fast-moving floodwater strips topsoil and leaches nutrients, reducing land fertility for future planting seasons. Downstream soil porosity and cohesion shape how severe that erosion and leaching become — a land-impact effect, not a dam structural reading.",
+      "mechanism": "Nutrient leaching removes nitrogen and other soluble minerals from the root zone; topsoil erosion removes the most fertile upper soil layer, sometimes requiring multiple seasons to recover naturally. More porous, less cohesive soils lose material faster under the same flood pulse.",
+      "farmerWhy": "Floods can wash away good soil, making the next season harder."
+    },
+    "water": {
+      "whatIsHappening": "Floodwater can contaminate drinking water sources with agricultural runoff, waste, or pathogens, raising waterborne disease risk (cholera, typhoid).",
+      "mechanism": "Overland flow carries surface contaminants into wells, boreholes, and open water sources used for drinking.",
+      "farmerWhy": "Drinking water may become unsafe — boil or use a known clean source."
+    },
+    "marketEconomic": {
+      "whatIsHappening": "Crop and livestock losses reduce household income and local food supply, which can drive short-term price increases for staple foods due to scarcity.",
+      "mechanism": "Reduced local supply combined with damaged market access routes (washed-out roads) constrains food availability, pushing prices up even as household incomes drop from lost produce/livestock.",
+      "farmerWhy": "Food prices may rise while your income falls if harvests or animals are lost."
+    },
+    "health": {
+      "whatIsHappening": "Flooding increases exposure to contaminated water and crowded shelters, raising disease risk especially for children and elders.",
+      "mechanism": "Pathogen-laden floodwater plus disrupted sanitation and health access compounds outbreak risk.",
+      "farmerWhy": "Keep families away from dirty floodwater when you can."
+    }
+  },
+  "flood_dam": {
+    "label": "Flood — operational dam release",
+    "farmerIntro": "An unexpected or elevated dam release is raising flood risk downstream.",
+    "livestock": {
+      "whatIsHappening": "Sudden river rise from dam release can trap herds on low banks with less warning than local rain alone.",
+      "mechanism": "Dam-driven hydrographs rise faster than rainfall runoff in some reaches; animals grazing riverine corridors may be cut off before herders relocate.",
+      "farmerWhy": "Water can rise quickly from the dam — move herds off low riverbanks early."
+    },
+    "crops": {
+      "whatIsHappening": "Riverbank and floodplain crops face rapid inundation from upstream release, not only local storms.",
+      "mechanism": "Controlled or emergency spill increases channel stage downstream on a 12–24h travel window; fields near the Omo corridor flood even when local skies are clear.",
+      "farmerWhy": "Fields near the river can flood even if it is not raining where you are."
+    },
+    "soil": {
+      "whatIsHappening": "Fast channel flow erodes banks and deposits silt that can bury seedlings or strip fertile edges. Downstream soil porosity and cohesion shape scour and nutrient leaching once floodwater arrives — land impact, not dam structure (Gibe III is RCC gravity).",
+      "mechanism": "High discharge increases shear stress on banks; sediment load remobilizes, reshaping floodplain soils after the pulse. More porous, less cohesive soils erode and leach faster under the same release pulse.",
+      "farmerWhy": "River edges may lose soil or get covered in silt after a surge."
+    },
+    "water": {
+      "whatIsHappening": "Sudden stage rise can overtop unprotected wells and mix river water with household sources.",
+      "mechanism": "Rapid hydrograph peaks overwhelm informal intake points before communities can seal or elevate them.",
+      "farmerWhy": "Protect drinking water stores before the river rises."
+    },
+    "marketEconomic": {
+      "whatIsHappening": "Dam-driven floods can cut ferry and road links along the corridor, delaying markets and aid.",
+      "mechanism": "Infrastructure on the floodplain fails under sudden stage; trade volumes drop while perishable goods spoil.",
+      "farmerWhy": "Markets and transport may shut for days — plan food and cash early."
+    },
+    "health": {
+      "whatIsHappening": "Rapid inundation increases drowning and injury risk during night-time or surprise rises.",
+      "mechanism": "Short lead times leave less time for orderly evacuation of low settlements.",
+      "farmerWhy": "Stay off low ground at night when dam warnings are active."
+    }
+  },
+  "compound": {
+    "label": "Compound flood — rain and dam together",
+    "farmerIntro": "Rain and dam release are overlapping — flood risk is higher than either alone.",
+    "livestock": {
+      "whatIsHappening": "Herds face both local waterlogging and a faster river pulse, leaving fewer safe grazing corridors.",
+      "mechanism": "When rain-wave and dam-surge arrivals overlap within ~24h, inundation depth and duration increase non-linearly, crowding animals onto remaining high ground and amplifying disease and stress losses.",
+      "farmerWhy": "Two floods at once leave less safe grazing — move early to known high ground."
+    },
+    "crops": {
+      "whatIsHappening": "Fields may stay flooded longer, killing crops that might have survived a short single flood.",
+      "mechanism": "Compound severity raises peak stage and prolongs saturation beyond the 2–4 day tolerance of maize/sorghum roots, increasing total crop failure risk.",
+      "farmerWhy": "Crops may stay underwater longer — harvest what you can and protect seed."
+    },
+    "soil": {
+      "whatIsHappening": "Longer inundation deepens nutrient loss and bank collapse along the corridor.",
+      "mechanism": "Extended saturation plus higher peak flow compounds leaching and erosion beyond single-signal events.",
+      "farmerWhy": "Land may need more recovery time after a compound flood."
+    },
+    "water": {
+      "whatIsHappening": "Contamination risk lasts longer as floodwater sits and mixes from both sources.",
+      "mechanism": "Dual hydrographs extend the window of overland contaminant transport into domestic sources.",
+      "farmerWhy": "Treat drinking water carefully for longer after compound floods."
+    },
+    "marketEconomic": {
+      "whatIsHappening": "Larger simultaneous losses hit household income and local food supply harder; prices often spike while roads stay cut.",
+      "mechanism": "Non-linear impact on production plus corridor transport failure widens the local supply gap.",
+      "farmerWhy": "Expect harder income and market shocks — prioritize people and animals first."
+    },
+    "health": {
+      "whatIsHappening": "Higher displacement and longer standing water raise outbreak and injury risk.",
+      "mechanism": "Compound events expand the population exposed and the duration of unsafe water contact.",
+      "farmerWhy": "Keep children away from floodwater and seek help early if anyone falls ill."
+    }
+  },
+  "drought": {
+    "label": "Drought / dry spell",
+    "farmerIntro": "There's a drought affecting your area.",
+    "crops": {
+      "whatIsHappening": "Insufficient soil moisture stunts growth or causes total crop failure, especially for water-intensive varieties.",
+      "mechanism": "Without adequate water, plants cannot complete photosynthesis and nutrient uptake normally, leading to stunted growth, reduced yield, or death before maturity.",
+      "farmerWhy": "Your crops may not get enough water to grow well."
+    },
+    "livestock": {
+      "whatIsHappening": "Reduced pasture and water availability leads to malnutrition, lower milk production, and increased mortality risk if drought is prolonged.",
+      "mechanism": "Grazing land dries out and forage quality drops; herders must travel further for water and pasture, increasing stress and reducing body condition.",
+      "farmerWhy": "Your livestock may struggle to find enough grazing and water."
+    },
+    "soil": {
+      "whatIsHappening": "Dry soil becomes more vulnerable to erosion by wind, and loses structure, making future planting harder even after rain returns.",
+      "mechanism": "Lack of moisture and vegetation cover reduces soil cohesion, increasing wind erosion risk and reducing water infiltration capacity when rains do return.",
+      "farmerWhy": "Dry bare soil can blow away and soak rain poorly later."
+    },
+    "water": {
+      "whatIsHappening": "Water points dry or concentrate animals, increasing competition and contamination at remaining sources.",
+      "mechanism": "Reduced recharge and higher evaporative demand shrink usable surface/groundwater; crowding at remaining points raises pathogen load.",
+      "farmerWhy": "Known water points matter more — move toward them early."
+    },
+    "marketEconomic": {
+      "whatIsHappening": "Reduced crop and milk yields shrink household income. Many herders are forced into distress sales of livestock at low prices to cut feeding costs, temporarily crashing livestock prices, followed later by scarcity-driven price spikes once herds are depleted. Food prices generally rise as local supply drops.",
+      "mechanism": "Herders destock early (sell animals cheaply before they weaken further) creating an oversupply and low prices in the short term; this is followed by a supply shortage and price recovery/spike once destocking has run its course and herds are smaller.",
+      "farmerWhy": "Livestock prices may drop temporarily as herders destock — consider timing sales carefully if possible. Food prices often rise."
+    },
+    "health": {
+      "whatIsHappening": "Reduced food availability and dietary diversity increases malnutrition risk, particularly in children.",
+      "mechanism": "Lower crop and livestock yields reduce both direct food access and household income available to purchase food, compounding nutritional stress.",
+      "farmerWhy": "Watch children's meals — less milk and harvest can mean less food at home."
+    }
+  }
+}

@@ -118,28 +118,34 @@ def build_dam_prediction(
             "label": "Forecast rain (3d, upstream)",
             "value": f"{float(forecast.get('next3_day') or 0):.1f} mm",
             "source": "forecast",
-            "role": "Forward inflow — dam overflow outlook",
+            "role": "Forward inflow — operational release pressure outlook",
         },
         {
             "id": "forecast_7d",
             "label": "Forecast rain (7d, upstream)",
             "value": f"{float(forecast.get('next7_day') or 0):.1f} mm",
             "source": "forecast",
-            "role": "Weekly reservoir pressure trend",
+            "role": "Weekly reservoir fill-rate / pressure trend",
         },
         {
             "id": "soil_trend",
-            "label": "Soil moisture trend (upstream)",
+            "label": "Catchment soil moisture (inflow / fill-rate)",
             "value": str(soil.get("trend") or "stable"),
             "source": "forecast",
-            "role": "Wet soil → faster runoff to reservoir",
+            "role": (
+                "Reservoir inflow indicator — wet catchment soil means more rain "
+                "becomes runoff into the reservoir (not dam structural monitoring; "
+                "Gibe III is RCC gravity)"
+            ),
         },
         {
             "id": "dam_outlook",
-            "label": "Dam overflow outlook",
-            "value": str(outlook.get("dam_overflow") or "Stable"),
+            "label": "Operational release risk outlook",
+            "value": str(
+                outlook.get("dam_release_outlook") or outlook.get("dam_overflow") or "Stable"
+            ),
             "source": "forecast",
-            "role": "Rules-based forward trend (not SCADA)",
+            "role": "Rules-based forward trend for unexpected/elevated release (not SCADA)",
         },
         {
             "id": "rain_proxy_release",
@@ -215,7 +221,7 @@ def build_dam_prediction(
     honesty = (
         "Predicted operating picture from rain + forecast pointers"
         + (" blended with a fresh operator report." if manual else ".")
-        + " Not official Gibe III SCADA — sensors will replace estimates."
+        + " Not official Gibe III SCADA - sensors will replace estimates."
     )
 
     return {

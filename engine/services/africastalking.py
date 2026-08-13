@@ -6,41 +6,54 @@ from typing import Any
 
 import httpx
 
-AT_API_KEY = os.getenv("AT_API_KEY", "")
-AT_USERNAME = os.getenv("AT_USERNAME", "sandbox")
+AT_API_KEY = os.getenv("AT_API_KEY", "").strip().strip('"').strip("'")
+AT_USERNAME = os.getenv("AT_USERNAME", "sandbox").strip().strip('"').strip("'")
 AT_SMS_URL = os.getenv(
     "AT_SMS_URL",
     "https://api.sandbox.africastalking.com/version1/messaging",
-)
+).strip()
 # WhatsApp has no sandbox — production AT WhatsApp sender number required.
-AT_WHATSAPP_NUMBER = os.getenv("AT_WHATSAPP_NUMBER", "")
+AT_WHATSAPP_NUMBER = os.getenv("AT_WHATSAPP_NUMBER", "").strip().strip('"').strip("'")
 AT_WHATSAPP_URL = os.getenv(
     "AT_WHATSAPP_URL",
     "https://chat.africastalking.com/whatsapp/message/send",
-)
+).strip()
 
 
 def send_sms(phone: str, message: str) -> dict[str, Any]:
+    """
+    SMS provider selection.
+    Default preference for this project: Africa's Talking first.
+    Set SMS_PROVIDER=twilio only if you intentionally want Twilio SMS.
+    """
     sms_provider = os.getenv("SMS_PROVIDER", "auto").lower()
-    if sms_provider in ("auto", "twilio"):
+
+    # Explicit Twilio only when requested (or auto with no AT credentials).
+    if sms_provider == "twilio":
         from services import twilio_dispatch
 
         if twilio_dispatch.sms_available():
             return twilio_dispatch.send_sms(phone, message)
-        if sms_provider == "twilio":
-            return {
-                "mode": "demo",
-                "channel": "sms",
-                "provider": "twilio",
-                "to": phone,
-                "message": message,
-                "note": "SMS_PROVIDER=twilio but Twilio env incomplete",
-            }
-
-    if not AT_API_KEY or not AT_USERNAME:
         return {
             "mode": "demo",
             "channel": "sms",
+            "provider": "twilio",
+            "to": phone,
+            "message": message,
+            "note": "SMS_PROVIDER=twilio but Twilio env incomplete",
+        }
+
+    if not AT_API_KEY or not AT_USERNAME:
+        # Last-resort fallback for local demos when AT is unset.
+        if sms_provider == "auto":
+            from services import twilio_dispatch
+
+            if twilio_dispatch.sms_available():
+                return twilio_dispatch.send_sms(phone, message)
+        return {
+            "mode": "demo",
+            "channel": "sms",
+            "provider": "africastalking",
             "to": phone,
             "message": message,
             "note": "AT_API_KEY/AT_USERNAME missing — SMS simulated only",
@@ -51,16 +64,28 @@ def send_sms(phone: str, message: str) -> dict[str, Any]:
         "to": phone,
         "message": message,
     }
-    with httpx.Client(timeout=20.0) as client:
-        res = client.post(
-            AT_SMS_URL,
-            data=body,
-            headers={
-                "apiKey": AT_API_KEY,
-                "Accept": "application/json",
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-        )
+    # Africa's Talking SMS shortcode (e.g. 51567) — used as sender when set.
+    shortcode = (os.getenv("AT_SMS_SHORTCODE") or os.getenv("USSD_CHANNEL") or "").strip()
+    if shortcode:
+        body["from"] = shortcode
+    try:
+        with httpx.Client(timeout=20.0) as client:
+            res = client.post(
+                AT_SMS_URL,
+                data=body,
+                headers={
+                    "apiKey": AT_API_KEY,
+                    "Accept": "application/json",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+            )
+    except httpx.HTTPError as exc:
+        return {
+            "mode": "error",
+            "channel": "sms",
+            "status": 0,
+            "body": str(exc),
+        }
     if res.status_code >= 400:
         return {"mode": "error", "channel": "sms", "status": res.status_code, "body": res.text}
     return {

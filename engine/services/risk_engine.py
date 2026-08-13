@@ -31,9 +31,12 @@ class RiskResult:
     compound_severity: float
     tier: Tier
     data_quality: str  # "simulated" | "live_feed"
-    ml_flood_probability: float | None  # 0..1 (optional ML corroboration)
-    ml_model_mode: str | None  # "chirps_open_meteo_only" | "glofas_enhanced"
-    ml_honesty: str | None
+    ml_flood_probability: float | None  # 0..1 (optional ML corroboration)
+
+    ml_model_mode: str | None  # "chirps_open_meteo_only" | "glofas_enhanced"
+
+    ml_honesty: str | None
+
     plain_summary: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -92,9 +95,12 @@ def compute_compound_risk(
     dam_discharge_m3s: float,
     *,
     data_quality: str = "simulated",
-    ml_flood_probability: float | None = None,
-    ml_model_mode: str | None = None,
-    ml_honesty: str | None = None,
+    ml_flood_probability: float | None = None,
+
+    ml_model_mode: str | None = None,
+
+    ml_honesty: str | None = None,
+
 ) -> RiskResult:
     rain_score = rain_score_from_mm(rain_mm)
     dam_score = dam_score_from_discharge(dam_discharge_m3s)
@@ -108,14 +114,22 @@ def compute_compound_risk(
     else:
         severity = min(100.0, max(rain_score, dam_score))
 
-    # ML corroboration is an "additional confidence" term:
-    # - It must not replace the existing rain/dam structural logic.
-    # - We apply it as a lower-bound on severity (scaled conservatively).
-    if ml_flood_probability is not None:
-        ml_score = _clamp(ml_flood_probability * 100.0)
-        # conservative blend: ML can raise severity but not exceed it outright
-        severity = min(100.0, max(severity, ml_score * 0.85))
-
+    # ML corroboration is an "additional confidence" term:
+
+    # - It must not replace the existing rain/dam structural logic.
+
+    # - We apply it as a lower-bound on severity (scaled conservatively).
+
+    if ml_flood_probability is not None:
+
+        ml_score = _clamp(ml_flood_probability * 100.0)
+
+        # conservative blend: ML can raise severity but not exceed it outright
+
+        severity = min(100.0, max(severity, ml_score * 0.85))
+
+
+
     tier = score_to_tier(severity)
 
     if compound_active:
@@ -131,10 +145,14 @@ def compute_compound_risk(
             f"Peak single-signal severity {severity:.0f}/100 ({tier}). Data: {data_quality}."
         )
 
-    if ml_flood_probability is not None:
-        p = ml_flood_probability * 100.0
-        plain += f" ML corroboration: {p:.0f}% ({ml_model_mode or 'model'})."
-
+    if ml_flood_probability is not None:
+
+        p = ml_flood_probability * 100.0
+
+        plain += f" ML corroboration: {p:.0f}% ({ml_model_mode or 'model'})."
+
+
+
     return RiskResult(
         rain_mm=rain_mm,
         dam_discharge_m3s=dam_discharge_m3s,
@@ -147,8 +165,11 @@ def compute_compound_risk(
         compound_severity=round(severity, 2),
         tier=tier,
         data_quality=data_quality,
-        ml_flood_probability=ml_flood_probability,
-        ml_model_mode=ml_model_mode,
-        ml_honesty=ml_honesty,
+        ml_flood_probability=ml_flood_probability,
+
+        ml_model_mode=ml_model_mode,
+
+        ml_honesty=ml_honesty,
+
         plain_summary=plain,
     )

@@ -17,12 +17,19 @@ def _test_client():
     return TestClient(app)
 
 
+def _ussd_service_code(service_code: str | None = None) -> str:
+    import os
+
+    return (service_code or os.getenv("USSD_DIAL_CODE") or "*384*51567#").strip()
+
+
 def simulate_ussd(
     *,
     session_id: str | None = None,
     phone: str,
     text: str,
     reset: bool = False,
+    service_code: str | None = None,
 ) -> dict[str, Any]:
     """Proxy to POST /api/ussd — returns parsed CON/END screen text."""
     sid = (session_id or "").strip() or f"sim-ussd-{uuid.uuid4().hex[:10]}"
@@ -36,6 +43,7 @@ def simulate_ussd(
             "sessionId": sid,
             "phoneNumber": phone,
             "text": text or "",
+            "serviceCode": _ussd_service_code(service_code),
         },
     )
     raw = res.text or ""
@@ -184,3 +192,77 @@ def preview_sms(
         "sector": sector,
         "region_id": region_id,
     }
+
+
+def sms_shortcode() -> str:
+    import os
+
+    return (os.getenv("AT_SMS_SHORTCODE") or os.getenv("USSD_CHANNEL") or "51567").strip()
+
+
+def simulate_sms_inbound(
+    *,
+    phone: str,
+    text: str,
+    to: str | None = None,
+) -> dict[str, Any]:
+    """
+    Simulate a farmer texting the AT shortcode (default 51567).
+    Uses the same SOS lifecycle as live Africa's Talking inbound SMS.
+    """
+    from services import sos_lifecycle
+
+    shortcode = (to or sms_shortcode()).strip() or "51567"
+    handled = sos_lifecycle.handle_inbound_sms_text(
+        phone, text, channel="SMS", send_confirm_sms=True
+    )
+    if handled:
+        session_store.log_action(
+            phone,
+            None,
+            "sim_sms_sos",
+            {"to": shortcode, "path": handled.get("path"), "text": (text or "")[:120]},
+        )
+        return {
+            "ok": True,
+            "status": 200,
+            "shortcode": shortcode,
+            "from": phone,
+            "text": text,
+            "result": {
+                "ok": True,
+                "handled": "sos",
+                "path": handled.get("path"),
+                "confirm_message": handled.get("confirm_message") or handled.get("reply"),
+                "sms": handled.get("sms"),
+                "notify": handled.get("notify"),
+                "entry": handled.get("entry"),
+            },
+        }
+
+    session_store.log_action(
+        phone, None, "sim_sms_inbound", {"to": shortcode, "text": (text or "")[:500]}
+    )
+    return {
+        "ok": True,
+        "status": 200,
+        "shortcode": shortcode,
+        "from": phone,
+        "text": text,
+        "result": {"ok": True, "handled": "logged"},
+    }
+
+
+def send_alert_sms(
+    *,
+    phone: str,
+    sector: str = "pastoralist",
+    region_id: str = "turkana",
+    lang: str = "en",
+) -> dict[str, Any]:
+    """Outbound alert SMS to a farmer (desk / demo send)."""
+    from services import africastalking
+
+    preview = preview_sms(sector=sector, region_id=region_id, lang=lang)
+    sms = africastalking.send_sms(phone, str(preview.get("message") or ""))
+    return {"ok": True, "preview": preview, "sms": sms, "shortcode": sms_shortcode()}

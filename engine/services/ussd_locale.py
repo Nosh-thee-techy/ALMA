@@ -50,9 +50,11 @@ def main_menu(lang: str) -> str:
             "CON ALMA Early Action\n"
             "1. Flood risk now\n"
             "2. Confirm evacuation\n"
-            "3. Report river level\n"
-            "4. Claim feed voucher\n"
-            "5. Emergency cash"
+            "3. Report river\n"
+            "4. Feed voucher\n"
+            "5. Emergency cash\n"
+            "6. Observer\n"
+            "7. After (readiness)"
         ),
         "sw": (
             "CON ALMA Hatua ya Mapema\n"
@@ -60,7 +62,9 @@ def main_menu(lang: str) -> str:
             "2. Thibitisha kuhama\n"
             "3. Ripoti ya mto\n"
             "4. Vocha ya malisho\n"
-            "5. Pesa za dharura"
+            "5. Pesa za dharura\n"
+            "6. Mtazamaji\n"
+            "7. Baada (readiness)"
         ),
         "trk": (
             "CON ALMA Early Action\n"
@@ -68,7 +72,9 @@ def main_menu(lang: str) -> str:
             "2. Confirm move herds\n"
             "3. Report river\n"
             "4. Feed voucher\n"
-            "5. Emergency cash"
+            "5. Emergency cash\n"
+            "6. Observer\n"
+            "7. After"
         ),
         "orm": (
             "CON ALMA Early Action\n"
@@ -76,7 +82,9 @@ def main_menu(lang: str) -> str:
             "2. Mirkanessuu socho'insa\n"
             "3. Gabaasa laga\n"
             "4. Voucher nyaata\n"
-            "5. Maallaqa hatattamaa"
+            "5. Maallaqa hatattamaa\n"
+            "6. Observer\n"
+            "7. Booda"
         ),
         "am": (
             "CON ALMA early action\n"
@@ -84,10 +92,46 @@ def main_menu(lang: str) -> str:
             "2. Confirm herd move\n"
             "3. Report river\n"
             "4. Feed voucher\n"
-            "5. Emergency cash"
+            "5. Emergency cash\n"
+            "6. Observer\n"
+            "7. After"
         ),
     }
     return menus.get(lang) or menus["en"]
+
+
+def observer_org_menu(lang: str) -> str:
+    # Keep short — field staff report quickly
+    return (
+        "CON Your organization?\n"
+        "1. WRA\n"
+        "2. KMD\n"
+        "3. County\n"
+        "4. Community Observer\n"
+        "5. Other"
+    )
+
+
+def observer_type_menu(lang: str) -> str:
+    return (
+        "CON What are you reporting?\n"
+        "1. Water level\n"
+        "2. Dam activity\n"
+        "3. Rainfall observed"
+    )
+
+
+def observer_value_menu(lang: str, report_type: str) -> str:
+    if report_type == "water_level":
+        return "CON Water level?\n1. Low\n2. Normal\n3. High\n4. Very High/Overflowing"
+    if report_type == "dam_activity":
+        return (
+            "CON Dam activity?\n"
+            "1. No visible activity\n"
+            "2. Visible release/spillway\n"
+            "3. Unusual sound/movement"
+        )
+    return "CON Rainfall observed?\n1. None\n2. Light\n3. Moderate\n4. Heavy"
 
 
 def ward_menu(lang: str) -> str:
@@ -182,6 +226,71 @@ def cancelled(lang: str) -> str:
     return msg.get(lang) or msg["en"]
 
 
+def readiness_sector_menu(lang: str) -> str:
+    lines = {
+        "en": "CON After. Who are you?\n1. Farmer\n2. Herder\n3. Fisher",
+        "sw": "CON Baada. Wewe ni nani?\n1. Mkulima\n2. Mfugaji\n3. Mvuvi",
+        "trk": "CON After. Role:\n1. Farmer\n2. Herder\n3. Fisher",
+        "orm": "CON Booda. Eenya?\n1. Qonnaa\n2. Tiksee\n3. Qaadduu",
+        "am": "CON After. Role:\n1. Farmer\n2. Herder\n3. Fisher",
+    }
+    return lines.get(lang) or lines["en"]
+
+
+def readiness_crop_menu(lang: str) -> str:
+    lines = {
+        "en": "CON After-event (My Readiness)\n1. Maize\n2. Sorghum\n3. Other crops",
+        "sw": "CON Baada ya tukio\n1. Mahindi\n2. Mtama\n3. Mengine",
+        "trk": "CON After-event\n1. Maize\n2. Sorghum\n3. Other",
+        "orm": "CON Booda\n1. Boqqolloo\n2. Mishinga\n3. Kan biraa",
+        "am": "CON After-event\n1. Maize\n2. Sorghum\n3. Other",
+    }
+    return lines.get(lang) or lines["en"]
+
+
+def readiness_action_menu(lang: str, facts: dict[str, Any]) -> str:
+    done = facts.get("done", 0)
+    total = facts.get("total", 0)
+    tip = str(facts.get("tip") or "All after-actions done.")
+    if len(tip) > 70:
+        tip = tip[:67].rstrip() + "."
+    eligible = bool(facts.get("eligible"))
+    head_line = str(facts.get("ussdHead") or "").strip()
+    if not head_line:
+        head_line = f"After {done}/{total}"
+    head = {
+        "en": f"CON {head_line}\n{tip}",
+        "sw": f"CON {head_line}\n{tip}",
+        "trk": f"CON {head_line}\n{tip}",
+        "orm": f"CON {head_line}\n{tip}",
+        "am": f"CON {head_line}\n{tip}",
+    }.get(lang) or f"CON {head_line}\n{tip}"
+    if facts.get("all_done"):
+        extra = {
+            "en": "\nAll done. 0. Back",
+            "sw": "\nUmemaliza. 0. Rudi",
+        }.get(lang, "\nAll done. 0. Back")
+        if eligible:
+            extra = {
+                "en": "\n3. Log recovery interest",
+                "sw": "\n3. Sajili msaada",
+            }.get(lang, "\n3. Log recovery interest") + extra
+        return head + extra
+    body = {
+        "en": "\n1. I did this\n2. Next tip",
+        "sw": "\n1. Nimefanya\n2. Ifuatayo",
+        "trk": "\n1. I did this\n2. Next",
+        "orm": "\n1. Na godheesse\n2. Itti aanu",
+        "am": "\n1. I did this\n2. Next",
+    }.get(lang) or "\n1. I did this\n2. Next tip"
+    if eligible:
+        body += {
+            "en": "\n3. Log recovery",
+            "sw": "\n3. Sajili msaada",
+        }.get(lang, "\n3. Log recovery")
+    return head + body
+
+
 def invalid(lang: str, dial: str) -> str:
     msg = {
         "en": f"END Invalid choice. Dial {dial} again.",
@@ -199,13 +308,27 @@ def localize_action(lang: str, kind: str, facts: dict[str, Any]) -> str:
     ward = str(facts.get("ward") or "ward")
 
     if kind == "risk":
-        templates = {
-            "en": f"{ward}: flood {tier}. Move to high ground if water rises. *384*96428#",
-            "sw": f"{ward}: mafuriko {tier}. Nenda mahali pa juu. *384*96428#",
-            "trk": f"{ward}: flood {tier}. Go high ground. *384*96428#",
-            "orm": f"{ward}: balaa {tier}. Gara olaanaatti. *384*96428#",
-            "am": f"{ward}: flood {tier}. Go high ground. *384*96428#",
-        }
+        why = str(facts.get("why") or "").strip()
+        # Prefer short why clause when present; stay under USSD limit
+        if why:
+            short_why = why.replace("Reason: ", "")
+            if len(short_why) > 48:
+                short_why = short_why[:45].rstrip() + "…"
+            templates = {
+                "en": f"{ward}: flood {tier}. {short_why} Dial *384*96428#",
+                "sw": f"{ward}: mafuriko {tier}. {short_why} *384*96428#",
+                "trk": f"{ward}: flood {tier}. {short_why} *384*96428#",
+                "orm": f"{ward}: balaa {tier}. {short_why} *384*96428#",
+                "am": f"{ward}: flood {tier}. {short_why} *384*96428#",
+            }
+        else:
+            templates = {
+                "en": f"{ward}: flood {tier}. Move to high ground if water rises. *384*96428#",
+                "sw": f"{ward}: mafuriko {tier}. Nenda mahali pa juu. *384*96428#",
+                "trk": f"{ward}: flood {tier}. Go high ground. *384*96428#",
+                "orm": f"{ward}: balaa {tier}. Gara olaanaatti. *384*96428#",
+                "am": f"{ward}: flood {tier}. Go high ground. *384*96428#",
+            }
         return _clip(templates.get(lang) or templates["en"])
 
     if kind == "evac":
@@ -253,6 +376,19 @@ def localize_action(lang: str, kind: str, facts: dict[str, Any]) -> str:
             "trk": f"Cash KES {amount}. Ref {ref}.",
             "orm": f"Maallaqa KES {amount}. Ref {ref}.",
             "am": f"Cash KES {amount}. Ref {ref}.",
+        }
+        return _clip(templates.get(lang) or templates["en"])
+
+    if kind == "readiness":
+        tip = str(facts.get("tip") or "Check crops and herds.")
+        done = facts.get("done", 0)
+        total = facts.get("total", 0)
+        templates = {
+            "en": f"After {done}/{total}. Next: {tip}",
+            "sw": f"Baada {done}/{total}. Ifuatayo: {tip}",
+            "trk": f"After {done}/{total}. Next: {tip}",
+            "orm": f"Booda {done}/{total}. Itti aanu: {tip}",
+            "am": f"After {done}/{total}. Next: {tip}",
         }
         return _clip(templates.get(lang) or templates["en"])
 

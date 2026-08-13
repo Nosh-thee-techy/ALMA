@@ -31,10 +31,22 @@ class VoiceBriefIn(BaseModel):
     ward_id: str | None = None
     lang: str = "en"
     sector: str | None = None
+    audience: str = "farmer"  # farmer | organizer
+    include_audio: bool = True
 
 
 class SosQueueStatusIn(BaseModel):
     status: Literal["being_handled", "resolved", "new"] = "being_handled"
+    acknowledged_by: str | None = None
+
+
+class SosIngestIn(BaseModel):
+    phone: str
+    channel: Literal["SMS", "USSD", "CALL"] = "SMS"
+    message_body: str = "SOS"
+    lang: str | None = None
+    community: str | None = None
+    ward_id: str | None = None
 
 
 @router.get("/api/dashboard/risk")
@@ -138,50 +150,6 @@ def list_cash(limit: int = 50):
     return {"ok": True, "requests": session_store.list_cash_requests(limit)}
 
 
-@router.get("/api/dashboard/sos")
-def dashboard_sos(limit: int = 50, include_resolved: bool = False):
-    items = session_store.list_sos_queue(limit=limit, include_resolved=include_resolved)
-    now = time.time()
-    out: list[dict] = []
-    for it in items:
-        last = float(it.get("last_received_at") or it.get("created_at") or now)
-        out.append(
-            {
-                "id": int(it["id"]),
-                "phone": it.get("phone"),
-                "community": it.get("community"),
-                "ward_id": it.get("ward_id"),
-                "channel": it.get("channels"),
-                "message_body": it.get("message_body"),
-                "status": it.get("status"),
-                "resent_count": int(it.get("resent_count") or 0),
-                "first_received_at": float(it.get("first_received_at") or last),
-                "last_received_at": last,
-                "received_at_label": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(last)),
-                "time_since_received_s": int(max(0, now - last)),
-            }
-        )
-    return {"ok": True, "items": out}
-
-
-@router.post("/api/dashboard/sos/{sos_id}/status")
-def dashboard_sos_status(sos_id: int, body: SosQueueStatusIn):
-    updated = session_store.set_sos_status(sos_id, body.status)
-    if not updated:
-        return {"ok": False, "error": "not_found"}
-    return {"ok": True, "item": updated}
-
-
-@router.post("/api/dashboard/voice-brief")
-def voice_brief(body: VoiceBriefIn):
-    """Desk + helpline: short spoken breakdown of live risk for a ward."""
-    return voice_agent.brief_script(
-        ward_id=body.ward_id,
-        lang=body.lang or "en",
-        sector=body.sector,
-    )
-
-
 class CommunityDispatchIn(BaseModel):
     community: str = Field(..., min_length=2)
     region_id: str = "turkana"
@@ -189,16 +157,143 @@ class CommunityDispatchIn(BaseModel):
     sector: str = "agriculture"
 
 
-@router.post("/api/dashboard/community-dispatch")
-def community_dispatch(body: CommunityDispatchIn):
+@router.get("/api/dashboard/ground-conditions")
+def ground_conditions():
+    """
+    Live ground-conditions + eventPhase for Sector Guidance / last-mile.
+    Drives before/after guidance from the same risk scoring as live-signals.
+    """
+    from services import ground_conditions as gc
+
+    return gc.snapshot_from_live()
+
+
+@router.get("/api/dashboard/channel-guidance")
+def channel_guidance(
+    sector: str = "pastoralist", region_id: str = "turkana", lang: str = "en"
+):
+    """Farmer-facing before/after line from live risk scoring (SMS/USSD/Voice)."""
+    from services import ground_conditions as gc
+
+    return {
+        "ok": True,
+        **gc.channel_guidance(sector=sector, region_id=region_id, lang=lang),
+    }
+
+
+@router.post("/api/dashboard/dispatch-community")
+def dispatch_community(body: CommunityDispatchIn):
+    """NGO Sector Guidance — Send to Community (SMS path + alerts log)."""
     from services import community_dispatch
 
     return community_dispatch.dispatch_to_community(
         body.community,
-        region_id=body.region_id,
+        region_id=body.region_id if body.region_id in ("omo", "turkana") else "turkana",
         message=body.message,
         sector=body.sector,
     )
+
+
+@router.get("/api/dashboard/sos")
+def dashboard_sos(limit: int = 50, include_resolved: bool = False):
+    from services import sos_lifecycle
+
+    # Stage 3/5 timers run on desk poll so no separate cron is required for demo.
+    tick = sos_lifecycle.tick_escalations()
+    items = session_store.list_sos_queue(limit=limit, include_resolved=include_resolved)
+    now = time.time()
+    out = [sos_lifecycle.public_entry(it, now) for it in items]
+    return {
+        "ok": True,
+        "items": out,
+        "tick": tick,
+        "honesty": (
+            "ALMA is a routing and escalation system — it notifies responders and "
+            "escalates if they do not act. It cannot guarantee a human arrives in time."
+        ),
+        "backup_emergency_number": sos_lifecycle.BACKUP_EMERGENCY_NUMBER,
+    }
+
+
+@router.post("/api/dashboard/sos/ingest")
+def dashboard_sos_ingest(body: SosIngestIn):
+    """Desk / demo trigger for the same Stage-1 path as SMS/USSD/Call."""
+    from services import sos_lifecycle
+
+    return sos_lifecycle.ingest_sos(
+        body.phone,
+        channel=body.channel,
+        message_body=body.message_body or "SOS",
+        lang=body.lang,
+        community=body.community,
+        ward_id=body.ward_id,
+        send_confirm_sms=True,
+    )
+
+
+@router.post("/api/dashboard/sos/{sos_id}/status")
+def dashboard_sos_status(sos_id: int, body: SosQueueStatusIn):
+    from services import sos_lifecycle
+
+    if body.status == "being_handled":
+        updated = sos_lifecycle.mark_being_handled(
+            sos_id, acknowledged_by=body.acknowledged_by
+        )
+    elif body.status == "resolved":
+        updated = sos_lifecycle.mark_resolved(sos_id, resolved_by=body.acknowledged_by)
+    else:
+        updated = session_store.set_sos_status(sos_id, body.status)
+    if not updated:
+        return {"ok": False, "error": "not_found_or_invalid_status"}
+    return {"ok": True, "item": sos_lifecycle.public_entry(updated)}
+
+
+@router.post("/api/dashboard/voice-brief")
+def voice_brief(body: VoiceBriefIn):
+    """Desk + helpline: Alma speaks a short risk breakdown for a ward."""
+    return voice_agent.brief_script(
+        ward_id=body.ward_id,
+        lang=body.lang or "en",
+        sector=body.sector,
+        audience=body.audience or "farmer",
+        include_audio=body.include_audio,
+    )
+
+
+class AlmaChatIn(BaseModel):
+    message: str = Field("", max_length=800)
+    lang: str | None = None
+    include_audio: bool = True
+    mode: Literal["desk", "explain", "phone", "readiness"] = "desk"
+    phone: str | None = None
+
+
+@router.post("/api/dashboard/alma-chat")
+def alma_chat(body: AlmaChatIn):
+    """Alma conversational desk agent — Gemma/Featherless + ElevenLabs."""
+    from services import alma_agent
+
+    return alma_agent.chat(
+        body.message,
+        lang=body.lang,
+        include_audio=body.include_audio,
+        mode=body.mode,
+        phone=body.phone,
+    )
+
+
+@router.post("/api/dashboard/alma-explain")
+def alma_explain(lang: str = "en", include_audio: bool = True):
+    """Alma explains current home-dashboard analytics out loud."""
+    from services import alma_agent
+
+    return alma_agent.explain_dashboard(lang=lang if lang in ("en", "sw") else "en", include_audio=include_audio)
+
+
+@router.post("/api/dashboard/community-dispatch")
+def community_dispatch_alias(body: CommunityDispatchIn):
+    """Alias of /dispatch-community for older clients."""
+    return dispatch_community(body)
 
 
 @router.get("/api/dashboard/readiness-rollup")
@@ -211,6 +306,32 @@ def readiness_rollup():
 @router.get("/api/dashboard/community-reach")
 def community_reach():
     return {"ok": True, "reach": session_store.list_community_reach()}
+
+
+class MarkReachIn(BaseModel):
+    via: Literal["SMS", "USSD", "Voice", "Manual"] = "Manual"
+    note: str | None = Field(None, max_length=240)
+
+
+@router.post("/api/dashboard/community-reach/{ward_id}")
+def mark_community_reach(ward_id: str, body: MarkReachIn):
+    """Operator marks a ward as reached after SMS, call, radio, or field follow-up."""
+    wid = ward_id.strip().lower().replace(" ", "_")
+    if not wid:
+        return {"ok": False, "error": "ward_id required"}
+    session_store.set_last_reached_via(wid, body.via)
+    session_store.log_action(
+        None,
+        wid,
+        "reach_follow_up",
+        {
+            "ward_id": wid,
+            "via": body.via,
+            "note": (body.note or "").strip() or None,
+            "triggeredBy": "manual_reach_follow_up",
+        },
+    )
+    return {"ok": True, "ward_id": wid, "last_reached_via": body.via}
 
 
 class DamObservationIn(BaseModel):
@@ -245,10 +366,17 @@ def get_dam_observations(limit: int = 15):
 
 @router.get("/api/dashboard/voice-helpline")
 def voice_helpline_info():
+    import os
+
     return {
         "ok": True,
-        "ussd": "*384*96428#",
+        "ussd": os.getenv("USSD_DIAL_CODE", "*384*51567#"),
+        "sos_ussd": os.getenv("SOS_USSD_DIAL_CODE", "*384*51567#"),
+        "sms_shortcode": os.getenv("AT_SMS_SHORTCODE")
+        or os.getenv("USSD_CHANNEL")
+        or "51567",
         "voice_callback": "/api/voice",
+        "sos_voice_callback": "/api/voice/sos",
         "menu": {
             "1": "Live flood risk (plain language)",
             "2": "What to do now",
@@ -260,7 +388,192 @@ def voice_helpline_info():
             "en": voice_agent.helpline_menu_script("en"),
         },
         "note": (
-            "Point Africa's Talking Voice callback to PUBLIC_BASE_URL/api/voice. "
-            "Farmers without data use USSD; voice is the spoken helpline."
+            "Point Africa's Talking Voice callback to PUBLIC_BASE_URL/api/voice for the helpline. "
+            "Use a separate AT Voice number pointing to /api/voice/sos for emergencies — "
+            "do not nest SOS inside the helpline menu. "
+            "ALMA routes and escalates; humans respond."
+        ),
+        "registration_speed_dial": (
+            "Save the SOS number as contact 9. In an emergency, hold down 9 to call/text instantly."
+        ),
+    }
+
+
+# --- Ground observers + ICPAC + climatic cascade ---
+
+
+class GroundObserverIn(BaseModel):
+    phoneNumber: str
+    organizationId: str = "Community"
+    observerName: str | None = Field(None, max_length=120)
+    registeredLocation: str | None = Field(None, max_length=120)
+    verified: bool = False
+
+
+class GroundObserverVerifyIn(BaseModel):
+    phoneNumber: str
+    verified: bool = True
+
+
+class GroundObserverReportIn(BaseModel):
+    phoneNumber: str
+    reportType: str
+    value: str
+    organizationId: str | None = None
+
+
+class IcpacOutlookIn(BaseModel):
+    summary: str = Field(..., min_length=8, max_length=2000)
+    issuedDate: str | None = Field(None, max_length=40)
+    source: str | None = Field(None, max_length=200)
+    updatedBy: str | None = Field(None, max_length=120)
+
+
+@router.get("/api/dashboard/ground-observers")
+def list_ground_observers():
+    from services import ground_observers as go
+
+    return go.list_observers()
+
+
+@router.post("/api/dashboard/ground-observers")
+def create_ground_observer(body: GroundObserverIn):
+    from services import ground_observers as go
+
+    return go.register_observer(
+        body.phoneNumber,
+        body.organizationId,
+        observer_name=body.observerName,
+        registered_location=body.registeredLocation,
+        verified=body.verified,
+    )
+
+
+@router.post("/api/dashboard/ground-observers/verify")
+def verify_ground_observer(body: GroundObserverVerifyIn):
+    from services import ground_observers as go
+
+    return go.set_verified(body.phoneNumber, body.verified)
+
+
+@router.get("/api/dashboard/ground-observer-reports")
+def list_ground_observer_reports(limit: int = 40):
+    from services import ground_observers as go
+
+    return go.list_reports(limit=limit)
+
+
+@router.post("/api/dashboard/ground-observer-reports")
+def post_ground_observer_report(body: GroundObserverReportIn):
+    from services import ground_observers as go
+
+    return go.log_report(
+        body.phoneNumber,
+        body.reportType,
+        body.value,
+        organization_id=body.organizationId,
+        source="dashboard",
+    )
+
+
+@router.get("/api/dashboard/icpac-outlook")
+def get_icpac_outlook():
+    from services import icpac_outlook
+
+    return icpac_outlook.get_outlook()
+
+
+@router.post("/api/dashboard/icpac-outlook")
+def set_icpac_outlook(body: IcpacOutlookIn):
+    from services import icpac_outlook
+
+    return icpac_outlook.set_outlook(
+        body.summary,
+        issued_date=body.issuedDate,
+        source=body.source,
+        updated_by=body.updatedBy,
+    )
+
+
+@router.get("/api/dashboard/climatic-impact")
+def climatic_impact(state: str | None = None):
+    from services import climatic_impact as ci
+    from services.live_signals import get_live_signals
+
+    live = get_live_signals()
+    resolved = state or live.get("climatic_state") or "flood_rain"
+    return {
+        "ok": True,
+        "state": resolved,
+        "ngo": ci.ngo_briefing(str(resolved)),
+        "farmer": ci.farmer_briefing(str(resolved)),
+        "live_state": live.get("climatic_state"),
+    }
+
+
+@router.get("/api/dashboard/reach-blind-spots")
+def reach_blind_spots():
+    """Unreached / unconfirmed wards during an active elevated event."""
+    live = get_live_signals()
+    risk = live.get("risk") or {}
+    tier = str(risk.get("tier") or "safe")
+    compound = bool(risk.get("compound_active"))
+    active = compound or tier in ("warning", "severe")
+    reach = {str(r["ward_id"]).lower(): r for r in session_store.list_community_reach()}
+    wards = load_wards().get("features") or load_wards().get("wards") or []
+    # wards may be geojson features or a flat list depending on loader
+    ward_ids: list[str] = []
+    if isinstance(wards, list):
+        for w in wards:
+            if isinstance(w, dict):
+                props = w.get("properties") or w
+                wid = props.get("id") or props.get("ward_id") or w.get("id")
+                if wid:
+                    ward_ids.append(str(wid).lower().replace(" ", "_"))
+    if not ward_ids:
+        ward_ids = [
+            "omorate",
+            "kalam",
+            "todonyang",
+            "nachukui",
+            "lowarengak",
+            "kalokol",
+            "kangatotha",
+        ]
+    # Deduplicate preserve order
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for wid in ward_ids:
+        if wid not in seen:
+            seen.add(wid)
+            ordered.append(wid)
+
+    def _label(wid: str) -> str:
+        return wid.replace("_", " ").title()
+
+    unreached = []
+    for wid in ordered:
+        row = reach.get(wid)
+        via = str((row or {}).get("last_reached_via") or "Unreached")
+        if via.lower() in ("unreached", "unconfirmed", ""):
+            unreached.append(
+                {
+                    "ward_id": wid,
+                    "community": _label(wid),
+                    "last_reached_via": via if via else "Unreached",
+                }
+            )
+    return {
+        "ok": True,
+        "active_event": active,
+        "unreached_or_unconfirmed_count": len(unreached) if active else 0,
+        "wards": unreached if active else [],
+        "unreached": [u["community"] for u in unreached] if active else [],
+        "unconfirmed": [],
+        "tier": tier,
+        "compound_active": compound,
+        "honesty_note": (
+            "Do not claim full basin reach. Follow up on each unreached community "
+            "(SMS, call, radio, or field), then mark it reached."
         ),
     }

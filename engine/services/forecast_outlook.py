@@ -46,8 +46,12 @@ def parse_forecast_rainfall(daily_precip: list[float | None]) -> dict[str, float
 
 def parse_soil_moisture(hourly: dict[str, list[float | None]]) -> dict[str, Any]:
     """
-    Soil moisture trend indicates runoff speed — saturated soil means incoming rain
-    runs off faster and more dangerously than the same rainfall on dry soil.
+    Soil moisture is an inflow / runoff indicator — not dam structural integrity.
+
+    Upstream (Gibe III catchment): wetter soil → more rainfall becomes runoff INTO
+    the reservoir (fill-rate / release-pressure driver). Downstream: wetter soil →
+    faster overland flow and higher flood-impact severity on land once water arrives.
+    Gibe III is an RCC gravity dam; soil data does not monitor dam structure.
     """
     # Surface + shallow profile average (0–9 cm)
     series: list[float] = []
@@ -170,14 +174,19 @@ def outlook_summary(
     downstream: dict[str, Any],
     dam_upstream: dict[str, Any],
 ) -> dict[str, Any]:
+    dam_release = dam_upstream.get("risk_outlook") or "Stable"
     return {
         "downstream_flood": downstream.get("risk_outlook") or "Stable",
-        "dam_overflow": dam_upstream.get("risk_outlook") or "Stable",
+        # Operational release risk (unexpected/elevated discharge), not spillway "overflow".
+        "dam_release_outlook": dam_release,
+        # Legacy key — prefer dam_release_outlook in new UI.
+        "dam_overflow": dam_release,
         "downstream_forecast_3d_mm": (downstream.get("forecast_rainfall") or {}).get("next3_day"),
         "dam_forecast_3d_mm": (dam_upstream.get("forecast_rainfall") or {}).get("next3_day"),
         "note": (
             "Forecast-informed risk outlook — forward-looking Open-Meteo trend, "
-            "not AI-predicted flood forecasting. Does not replace current tier logic."
+            "not AI-predicted flood forecasting. Dam side is operational release risk "
+            "(not overflow). Does not replace current tier logic."
         ),
     }
 
