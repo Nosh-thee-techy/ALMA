@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { AlmaLogo } from "@/components/turkana/AlmaLogo";
+import { ThemeToggle } from "@/components/turkana/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +24,9 @@ function LoginPage() {
 
   return (
     <div className="min-h-screen bg-background px-4 py-10">
+      <div className="mx-auto mb-3 flex max-w-md justify-end">
+        <ThemeToggle collapsed />
+      </div>
       <div className="mx-auto max-w-md rounded-2xl border border-border bg-card p-6 shadow-sm">
         <div className="flex items-center gap-3">
           <AlmaLogo className="h-12 w-12 rounded-xl object-cover" />

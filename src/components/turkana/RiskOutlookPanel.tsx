@@ -44,14 +44,14 @@ export function OutlookBadge({ outlook, className }: { outlook: RiskOutlook; cla
 
 export function RiskOutlookPanel({
   downstreamFlood,
-  damOverflow,
+  damReleaseOutlook,
   note,
   downstreamForecast3dMm,
   damForecast3dMm,
   compact = false,
 }: {
   downstreamFlood: RiskOutlook;
-  damOverflow: RiskOutlook;
+  damReleaseOutlook: RiskOutlook;
   note?: string;
   downstreamForecast3dMm?: number;
   damForecast3dMm?: number;
@@ -63,8 +63,9 @@ export function RiskOutlookPanel({
         Forecast-informed outlook
       </p>
       <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-        Rules-based trend from Open-Meteo forecast rain + soil moisture — not ML/LSTM flood
-        forecasting. Does not override current tier.
+        Rules-based trend from Open-Meteo forecast rain + soil moisture (inflow / flood-impact
+        indicators) — not ML/LSTM forecasting or dam structural monitoring. Does not override
+        current tier.
       </p>
       <div className={cn("mt-3 grid gap-2", compact ? "grid-cols-1" : "sm:grid-cols-2")}>
         <div className="rounded-md border border-border bg-background/80 px-3 py-2">
@@ -82,10 +83,10 @@ export function RiskOutlookPanel({
         </div>
         <div className="rounded-md border border-border bg-background/80 px-3 py-2">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Dam overflow outlook
+            Operational release risk outlook
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <OutlookBadge outlook={damOverflow} />
+            <OutlookBadge outlook={damReleaseOutlook} />
             {damForecast3dMm != null && (
               <span className="text-xs text-muted-foreground">
                 ~{damForecast3dMm} mm / 3d upstream forecast

@@ -100,6 +100,10 @@ export type LiveSignalsResponse = {
   risk_outlook?: {
     downstream_flood?: RiskOutlook;
 
+    /** Operational release risk outlook (preferred). */
+    dam_release_outlook?: RiskOutlook;
+
+    /** @deprecated Prefer dam_release_outlook — kept for older engine payloads. */
     dam_overflow?: RiskOutlook;
 
     downstream_forecast_3d_mm?: number;
@@ -149,6 +153,46 @@ export type LiveSignalsResponse = {
   };
 
   pitch_line?: string;
+
+  ground_observers?: {
+    layer?: {
+      estimated?: { rain_24h_mm?: number; dam_release_m3s?: number; label?: string };
+      ground_verified?: {
+        rain_mm_nudge?: number;
+        dam_m3s_nudge?: number;
+        verified_report_count?: number;
+        unverified_report_count?: number;
+        label?: string;
+      };
+      blended_for_risk?: { rain_24h_mm?: number; dam_release_m3s?: number };
+    };
+    recent?: Array<Record<string, unknown>>;
+    honesty?: string;
+  };
+
+  climatic_impact?: {
+    state?: string;
+    label?: string;
+    sectors?: Record<
+      string,
+      { whatIsHappening?: string; mechanism?: string }
+    >;
+    marketEconomic?: { whatIsHappening?: string; mechanism?: string };
+  };
+
+  climatic_state?: string;
+
+  icpac_regional_outlook?: {
+    ok?: boolean;
+    outlook?: {
+      summary?: string;
+      issuedDate?: string | null;
+      source?: string;
+      updatedAt?: number | null;
+    };
+    manual?: boolean;
+    honesty?: string;
+  };
 };
 
 export type DamPointerSource = "estimated" | "manual" | "forecast" | "partner";
@@ -224,7 +268,8 @@ export type LiveBasin = {
   riskOutlook: {
     downstreamFlood: RiskOutlook;
 
-    damOverflow: RiskOutlook;
+    /** Operational release risk (unexpected/elevated discharge) — not overflow. */
+    damReleaseOutlook: RiskOutlook;
 
     note?: string;
 
@@ -241,20 +286,35 @@ export type LiveBasin = {
   } | null;
 
   damPrediction: DamPredictionResponse | null;
+
+  climaticState: string | null;
+
+  climaticImpact: LiveSignalsResponse["climatic_impact"] | null;
+
+  groundObservers: LiveSignalsResponse["ground_observers"] | null;
+
+  icpacOutlook: LiveSignalsResponse["icpac_regional_outlook"] | null;
 };
 
-async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${engineBaseUrl()}${path}`, {
-    headers: { Accept: "application/json" },
-  });
-  if (!res.ok) throw new Error(`${path} → ${res.status}`);
-  return res.json() as Promise<T>;
+async function getJson<T>(path: string, timeoutMs = 8_000): Promise<T> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${engineBaseUrl()}${path}`, {
+      headers: { Accept: "application/json" },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error(`${path} → ${res.status}`);
+    return res.json() as Promise<T>;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function mapBasin(
   signals: LiveSignalsResponse,
   actions: EngineAction[],
-  reachByWard: Record<string, LastReachedVia> = {},
+  reachByWard: Record<string, LastReachedVia | { via: LastReachedVia; at: number | null }> = {},
 ): LiveBasin {
   const risk = signals.risk;
   const rainMm = Number(signals.rain?.rain_24h_mm ?? risk.rain_mm ?? 0);
@@ -371,15 +431,26 @@ function mapBasin(
     const etaDam = Math.round(risk.t_dam_arrival_h * distFactor);
     const wardKey = c.name.toLowerCase().replace(/\s+/g, "_");
 
-    const via = reachByWard[wardKey];
+    const reach = reachByWard[wardKey];
+    const via = typeof reach === "string" ? reach : reach?.via;
+    const reachedAt = typeof reach === "object" && reach ? reach.at : null;
+
+    // Downstream communities cool slightly; upstream / near-dam stay hotter.
+    const order: RiskTier[] = ["safe", "watch", "warning", "severe"];
+    let ti = order.indexOf((risk.tier || "watch") as RiskTier);
+    if (ti < 0) ti = 1;
+    if (c.distanceFromDamKm > 680) ti = Math.max(0, ti - 1);
+    if (c.distanceFromDamKm > 720) ti = Math.max(0, ti - 1);
+    if (risk.compound_active && c.distanceFromDamKm < 560) ti = Math.min(3, ti + 1);
 
     return {
       ...c,
-      tier: risk.tier,
+      tier: order[ti],
       rainEtaHours: etaRain,
       damEtaHours: etaDam,
       lastAlert: actions[0] ? "live feed" : "live risk",
       lastReachedVia: via,
+      lastReachedAt: reachedAt ?? null,
     };
   });
 
@@ -391,7 +462,9 @@ function mapBasin(
     ? {
         downstreamFlood: (outlook.downstream_flood || "Stable") as RiskOutlook,
 
-        damOverflow: (outlook.dam_overflow || "Stable") as RiskOutlook,
+        damReleaseOutlook: (outlook.dam_release_outlook ||
+          outlook.dam_overflow ||
+          "Stable") as RiskOutlook,
 
         note: outlook.note,
 
@@ -430,6 +503,14 @@ function mapBasin(
       : null,
 
     damPrediction: signals.dam_prediction ?? null,
+
+    climaticState: signals.climatic_state ?? null,
+
+    climaticImpact: signals.climatic_impact ?? null,
+
+    groundObservers: signals.ground_observers ?? null,
+
+    icpacOutlook: signals.icpac_regional_outlook ?? null,
   };
 }
 
@@ -491,21 +572,21 @@ function actionsToAlerts(actions: EngineAction[], liveTier: RiskTier): AlertReco
   });
 }
 
+export type ReachBlindSpotWard = {
+  ward_id: string;
+  community: string;
+  last_reached_via: string;
+};
+
 export type ReachBlindSpots = {
   ok: boolean;
-
   active_event: boolean;
-
   tier: string;
-
   compound_active: boolean;
-
   unreached: string[];
-
   unconfirmed: string[];
-
   unreached_or_unconfirmed_count: number;
-
+  wards?: ReachBlindSpotWard[];
   honesty_note?: string;
 };
 
@@ -517,38 +598,101 @@ export async function fetchReachBlindSpots(): Promise<ReachBlindSpots | null> {
   }
 }
 
+export async function markCommunityReached(
+  wardId: string,
+  via: Exclude<LastReachedVia, "Unreached"> = "Manual",
+  note?: string,
+): Promise<{ ok: boolean; ward_id?: string; error?: string }> {
+  const res = await fetch(
+    `${engineBaseUrl()}/api/dashboard/community-reach/${encodeURIComponent(wardId)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ via, note }),
+    },
+  );
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    ward_id?: string;
+    error?: string;
+  };
+  if (!res.ok || !json.ok) {
+    return { ok: false, error: json.error || `Mark reach failed (${res.status})` };
+  }
+  return { ok: true, ward_id: json.ward_id };
+}
+
+export async function dispatchCommunityFollowUp(
+  community: string,
+  regionId: "omo" | "turkana" = "turkana",
+  message?: string,
+): Promise<{ ok: boolean; contactCount?: number; error?: string }> {
+  const res = await fetch(`${engineBaseUrl()}/api/dashboard/community-dispatch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      community,
+      region_id: regionId,
+      message:
+        message ||
+        "ALMA follow-up: We could not confirm you received the flood alert. Reply SOS if in danger, or dial *384*96428# for guidance.",
+      sector: "agriculture",
+    }),
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    contactCount?: number;
+    error?: string;
+  };
+  if (!res.ok || !json.ok) {
+    return { ok: false, error: json.error || `Dispatch failed (${res.status})` };
+  }
+  return { ok: true, contactCount: json.contactCount };
+}
+
 export async function fetchLiveBasin(): Promise<LiveBasin> {
+  // Cap the hot path — desk should fall back rather than hang on a slow engine.
   const [signals, actionsRes, reachRes] = await Promise.all([
-    getJson<LiveSignalsResponse>("/api/dashboard/live-signals"),
-    getJson<{ ok: boolean; actions: EngineAction[] }>("/api/dashboard/actions?limit=40").catch(
-      () => ({
-        ok: false,
+    getJson<LiveSignalsResponse>("/api/dashboard/live-signals", 9_000),
+    getJson<{ ok: boolean; actions: EngineAction[] }>(
+      "/api/dashboard/actions?limit=40",
+      4_000,
+    ).catch(() => ({
+      ok: false,
+      actions: [] as EngineAction[],
+    })),
 
-        actions: [] as EngineAction[],
-      }),
-    ),
-
-    getJson<{ ok: boolean; reach: Array<{ ward_id: string; last_reached_via: string }> }>(
-      "/api/dashboard/community-reach",
-    ).catch(() => ({ ok: false, reach: [] })),
+    getJson<{
+      ok: boolean;
+      reach: Array<{ ward_id: string; last_reached_via: string; updated_at?: number }>;
+    }>("/api/dashboard/community-reach", 4_000).catch(() => ({ ok: false, reach: [] })),
   ]);
   if (!signals?.risk) throw new Error("live-signals missing risk");
-  const reachByWard: Record<string, LastReachedVia> = {};
+  const reachByWard: Record<string, { via: LastReachedVia; at: number | null }> = {};
 
   for (const r of reachRes.reach || []) {
     const via = r.last_reached_via;
 
-    if (via === "SMS" || via === "USSD" || via === "Voice" || via === "Unreached") {
-      reachByWard[r.ward_id] = via;
+    if (
+      via === "SMS" ||
+      via === "USSD" ||
+      via === "Voice" ||
+      via === "Manual" ||
+      via === "Unreached"
+    ) {
+      reachByWard[r.ward_id] = {
+        via,
+        at: typeof r.updated_at === "number" ? r.updated_at : null,
+      };
     }
   }
 
   return mapBasin(signals, actionsRes.actions || [], reachByWard);
 }
 
-export type SosChannel = "SMS" | "USSD";
+export type SosChannel = "SMS" | "USSD" | "CALL";
 
-export type SosStatus = "new" | "being_handled" | "resolved";
+export type SosStatus = "new" | "being_handled" | "resolved" | "reopened";
 
 export type SosEntry = {
   id: number;
@@ -567,6 +711,14 @@ export type SosEntry = {
 
   resent_count: number;
 
+  escalation_count?: number;
+
+  acknowledged_by?: string | null;
+
+  check_in_response?: string | null;
+
+  reopened_at?: number | null;
+
   first_received_at: number;
 
   last_received_at: number;
@@ -574,12 +726,20 @@ export type SosEntry = {
   received_at_label: string;
 
   time_since_received_s: number;
+
+  ack_overdue?: boolean;
+
+  backup_emergency_number?: string;
 };
 
 export async function fetchSosQueue(opts?: { limit?: number; includeResolved?: boolean }): Promise<{
   ok: boolean;
 
   items: SosEntry[];
+
+  honesty?: string;
+
+  backup_emergency_number?: string;
 }> {
   const limit = opts?.limit ?? 20;
 
@@ -587,6 +747,7 @@ export async function fetchSosQueue(opts?: { limit?: number; includeResolved?: b
 
   return await getJson(
     `/api/dashboard/sos?limit=${encodeURIComponent(String(limit))}&include_resolved=${encodeURIComponent(String(includeResolved))}`,
+    5_000,
   );
 }
 
@@ -606,6 +767,20 @@ export async function setSosStatus(
   if (!res.ok) throw new Error(`sos status update failed (${res.status})`);
 
   return (await res.json()) as { ok: boolean; item: SosEntry };
+}
+
+export async function ingestSosDemo(body: {
+  phone: string;
+  channel?: "SMS" | "USSD" | "CALL";
+  message_body?: string;
+}): Promise<{ ok: boolean; entry?: SosEntry; confirm_message?: string }> {
+  const res = await fetch(`${engineBaseUrl()}/api/dashboard/sos/ingest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`sos ingest failed (${res.status})`);
+  return (await res.json()) as { ok: boolean; entry?: SosEntry; confirm_message?: string };
 }
 
 export async function fetchDamObservations(limit = 15): Promise<{

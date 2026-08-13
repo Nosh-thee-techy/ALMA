@@ -23,6 +23,7 @@ export const lightMeta: Record<
     label: "Green — OK for now",
     meaning: "No urgent flood action. Keep normal monitoring.",
     panel: "border-risk-safe/40 bg-risk-safe-bg text-risk-safe-foreground",
+    /* Solid fill + ink (CSS forces dark ink in .dark so light green text does not wash out) */
     badge: "bg-risk-safe text-risk-safe-foreground",
     dot: "bg-risk-safe",
   },

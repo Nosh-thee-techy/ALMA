@@ -82,6 +82,22 @@ const RAW: Omit<BasinWard, "u" | "v">[] = [
 
 export const basinWards: BasinWard[] = RAW.map((w) => ({ ...w, ...toUV(w.lon, w.lat) }));
 
+/** Lon/lat for monitored communities (wards + approximate peers). */
+export const communityCoords: Record<string, { lat: number; lon: number }> = {
+  omorate: { lat: 4.8, lon: 36.05 },
+  kalam: { lat: 4.62, lon: 36.0 },
+  todonyang: { lat: 4.45, lon: 35.95 },
+  nachukui: { lat: 3.95, lon: 35.85 },
+  lowarengak: { lat: 3.72, lon: 35.78 },
+  kalokol: { lat: 3.52, lon: 35.75 },
+  kangatotha: { lat: 3.41, lon: 35.68 },
+};
+
+export function coordsForCommunity(name: string): { lat: number; lon: number } | null {
+  const key = name.toLowerCase().replace(/\s+/g, "_");
+  return communityCoords[key] || null;
+}
+
 export type AreaWeather = {
   wardId: string;
   name: string;

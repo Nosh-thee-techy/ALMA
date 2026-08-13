@@ -178,7 +178,8 @@ export function RiskMap({ communities, region }: { communities: Community[]; reg
           >
             <div className="font-semibold">{selected.name}</div>
             <div className="text-muted-foreground">
-              {selected.region} · {selected.population.toLocaleString()} people
+              {selected.region} · {selected.population.toLocaleString()} people ·{" "}
+              {selected.households.toLocaleString()} HH
             </div>
             <div className="mt-1">
               Rain ETA {selected.rainEtaHours}h · Dam ETA {selected.damEtaHours}h

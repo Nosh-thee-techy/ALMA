@@ -12,7 +12,7 @@ import { damSliderToM3s, triggerSimulator } from "@/lib/trigger-simulator";
 import { computeCompound, tierFromMetric, tierMeta, type RiskTier } from "@/lib/turkana-data";
 import { cn } from "@/lib/utils";
 
-function messageFor(tier: RiskTier, lang: "en" | "sw" | "local") {
+function messageFor(tier: RiskTier, lang: "en" | "sw" | "local", why?: string) {
   const en: Record<RiskTier, string> = {
     safe: "ALMA: River normal. No action. Dial *384*96428# if water rises.",
     watch: "ALMA: Water rising. Stay near high ground. Dial *384*96428#.",
@@ -31,7 +31,10 @@ function messageFor(tier: RiskTier, lang: "en" | "sw" | "local") {
     warning: "[Ng'aturkana] Flood soon. Move high. Dial *384*96428#.",
     severe: "[Ng'aturkana] Flood NOW. Leave low ground. Dial *384*96428#.",
   };
-  return { en, sw, local }[lang][tier];
+  const base = { en, sw, local }[lang][tier];
+  if (!why) return base;
+  const clause = why.length > 70 ? `${why.slice(0, 67)}…` : why;
+  return `${base} Reason: ${clause}`.slice(0, 280);
 }
 
 export function SimulatorPanel() {
@@ -55,6 +58,20 @@ export function SimulatorPanel() {
   const rainTier = tierFromMetric(rain);
   const damTier = tierFromMetric(dam);
   const compound = useMemo(() => computeCompound(rainTier, damTier), [rainTier, damTier]);
+
+  const whyLine = useMemo(() => {
+    const state = data.climaticState;
+    const sectors = data.climaticImpact?.sectors;
+    const crops = sectors?.crops?.whatIsHappening;
+    if (crops) return crops;
+    if (state === "drought") {
+      return "Your crops may not get enough water; livestock may struggle for grazing.";
+    }
+    if (state === "compound") {
+      return "Rain and dam together keep fields underwater longer.";
+    }
+    return "Waterlogged soil can kill crop roots within days.";
+  }, [data.climaticState, data.climaticImpact]);
 
   // Pitch dispatch → ALMA engine /api/simulator/trigger (risk + SMS).
   // Falls back to TanStack SMS helper if the Python engine is offline.
@@ -164,9 +181,9 @@ export function SimulatorPanel() {
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Sample plain-language alert
           </p>
-          <MsgBlock lang="English" text={messageFor(compound, "en")} />
-          <MsgBlock lang="Swahili" text={messageFor(compound, "sw")} />
-          <MsgBlock lang="Local (Ng'aturkana)" text={messageFor(compound, "local")} />
+          <MsgBlock lang="English" text={messageFor(compound, "en", whyLine)} />
+          <MsgBlock lang="Swahili" text={messageFor(compound, "sw", whyLine)} />
+          <MsgBlock lang="Local (Ng'aturkana)" text={messageFor(compound, "local", whyLine)} />
         </div>
 
         {ran && (

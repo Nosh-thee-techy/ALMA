@@ -3,23 +3,25 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
   Beef,
+  ChevronDown,
+  CloudRain,
   Fish,
   HeartPulse,
   Loader2,
   Send,
   ShieldAlert,
   Sprout,
-  CloudRain,
-  ArrowDown,
-  ArrowRight,
-  ArrowUp,
 } from "lucide-react";
 
 import { toast } from "sonner";
 
 import { LiveSourceBadge } from "@/components/turkana/LiveSourceBadge";
 import { RiskOutlookPanel } from "@/components/turkana/RiskOutlookPanel";
+import { IcpacOutlookPanel } from "@/components/turkana/IcpacOutlookPanel";
 
 import { Button } from "@/components/ui/button";
 
@@ -50,6 +52,105 @@ import {
 } from "@/lib/turkana-data";
 import { cn } from "@/lib/utils";
 import type { RiskOutlook } from "@/lib/alma-engine";
+import {
+  climaticImpactCascade,
+  ngoSectorCascade,
+  resolveCascadeState,
+  type CascadeState,
+} from "@/lib/climatic-impact-cascade";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+
+function CascadeBriefingCard({
+  climaticState,
+  compoundActive,
+  tier,
+  climateState,
+  droughtRisk,
+  rainScore,
+  damScore,
+  liveImpact,
+  sector,
+}: {
+  climaticState?: string | null;
+  compoundActive: boolean;
+  tier: string;
+  climateState: string;
+  droughtRisk: string;
+  rainScore?: number;
+  damScore?: number;
+  liveImpact?: {
+    state?: string;
+    label?: string;
+    sectors?: Record<string, { whatIsHappening?: string; mechanism?: string }>;
+    marketEconomic?: { whatIsHappening?: string; mechanism?: string };
+  } | null;
+  sector: SectorId;
+}) {
+  const state = resolveCascadeState({
+    climaticState: climaticState || liveImpact?.state,
+    compoundActive,
+    tier,
+    climateState,
+    droughtRisk,
+    rainScore,
+    damScore,
+  });
+  const sectorKey =
+    sector === "agriculture"
+      ? "crops"
+      : sector === "fisheries"
+        ? "water"
+        : sector === "health"
+          ? "health"
+          : "livestock";
+  const fromLive = liveImpact?.sectors?.[sectorKey];
+  const fallback = ngoSectorCascade(state, sector);
+  const what = fromLive?.whatIsHappening || fallback.whatIsHappening;
+  const mechanism = fromLive?.mechanism || fallback.mechanism;
+  const label = liveImpact?.label || climaticImpactCascade[state as CascadeState]?.label || fallback.label;
+  const market =
+    liveImpact?.marketEconomic ||
+    liveImpact?.sectors?.marketEconomic ||
+    climaticImpactCascade[state as CascadeState]?.marketEconomic;
+
+  return (
+    <Collapsible className="mt-3 rounded-md border border-border bg-card">
+      <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-bold hover:bg-dust">
+        <span>What&apos;s actually happening · {label}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-3 border-t border-border px-3 py-3 text-sm">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-primary">
+            What is happening
+          </p>
+          <p className="mt-1 leading-snug">{what}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            Mechanism (NGO / technical)
+          </p>
+          <p className="mt-1 leading-snug text-muted-foreground">{mechanism}</p>
+        </div>
+        {market?.whatIsHappening ? (
+          <div className="rounded-md bg-dust px-2.5 py-2">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-primary">
+              Market / economic (guidance only — not live prices)
+            </p>
+            <p className="mt-1 text-xs leading-snug">{market.whatIsHappening}</p>
+            {market.mechanism ? (
+              <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{market.mechanism}</p>
+            ) : null}
+          </div>
+        ) : null}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
 
 const sectorIcons: Record<SectorId, typeof Sprout> = {
   agriculture: Sprout,
@@ -190,10 +291,6 @@ export function SectorGuidance() {
   }, [phase, sector, status, rainEta]);
 
   useEffect(() => {
-    document.title = "Sector guidance | ALMA";
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
     async function loadRollup() {
       try {
@@ -255,7 +352,7 @@ export function SectorGuidance() {
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-5 py-4">
         <ShieldAlert className="h-5 w-5 text-muted-foreground" />
         <div className="flex-1">
-          <h2 className="text-base font-semibold">Sector guidance</h2>
+          <h2 className="text-base font-semibold">What each sector should do</h2>
           <p className="text-xs text-muted-foreground">{compoundTrigger.detail}</p>
         </div>
         <LiveSourceBadge isLive={isLive} loading={loading} error={error} />
@@ -268,7 +365,7 @@ export function SectorGuidance() {
         <RiskOutlookPanel
           downstreamFlood={riskOutlook.downstreamFlood}
 
-          damOverflow={riskOutlook.damOverflow}
+          damReleaseOutlook={riskOutlook.damReleaseOutlook}
 
           note={riskOutlook.note}
 
@@ -279,6 +376,8 @@ export function SectorGuidance() {
           compact
         />
       )}
+
+      <IcpacOutlookPanel initial={data.icpacOutlook} />
 
       {/* A1 ΓÇö Region summary */}
 
@@ -467,6 +566,18 @@ export function SectorGuidance() {
                     )}
                   </div>
 
+                  <CascadeBriefingCard
+                    climaticState={data.climaticState}
+                    compoundActive={st.compoundActive}
+                    tier={st.tier}
+                    climateState={st.climateState}
+                    droughtRisk={st.droughtRisk}
+                    rainScore={data.risk?.rain_score}
+                    damScore={data.risk?.dam_score}
+                    liveImpact={data.climaticImpact}
+                    sector={sector}
+                  />
+
                   {riskOutlook && (
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <span className="rounded bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
@@ -476,10 +587,10 @@ export function SectorGuidance() {
                       <OutlookInline outlook={riskOutlook.downstreamFlood} />
 
                       <span className="rounded bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                        Dam overflow
+                        Release risk
                       </span>
 
-                      <OutlookInline outlook={riskOutlook.damOverflow} />
+                      <OutlookInline outlook={riskOutlook.damReleaseOutlook} />
                     </div>
                   )}
 

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as CommunitiesRouteImport } from './routes/communities'
+import { Route as CompoundRouteImport } from './routes/compound'
 import { Route as DamRouteImport } from './routes/dam'
 import { Route as HelplineRouteImport } from './routes/helpline'
 import { Route as HomeRouteImport } from './routes/home'
@@ -37,6 +38,11 @@ const AlertsRoute = AlertsRouteImport.update({
 const CommunitiesRoute = CommunitiesRouteImport.update({
   id: '/communities',
   path: '/communities',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompoundRoute = CompoundRouteImport.update({
+  id: '/compound',
+  path: '/compound',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DamRoute = DamRouteImport.update({
@@ -99,6 +105,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/communities': typeof CommunitiesRoute
+  '/compound': typeof CompoundRoute
   '/dam': typeof DamRoute
   '/helpline': typeof HelplineRoute
   '/home': typeof HomeRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/communities': typeof CommunitiesRoute
+  '/compound': typeof CompoundRoute
   '/dam': typeof DamRoute
   '/helpline': typeof HelplineRoute
   '/home': typeof HomeRoute
@@ -132,6 +140,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/communities': typeof CommunitiesRoute
+  '/compound': typeof CompoundRoute
   '/dam': typeof DamRoute
   '/helpline': typeof HelplineRoute
   '/home': typeof HomeRoute
@@ -150,6 +159,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/communities'
+    | '/compound'
     | '/dam'
     | '/helpline'
     | '/home'
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/communities'
+    | '/compound'
     | '/dam'
     | '/helpline'
     | '/home'
@@ -182,6 +193,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/communities'
+    | '/compound'
     | '/dam'
     | '/helpline'
     | '/home'
@@ -199,6 +211,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlertsRoute: typeof AlertsRoute
   CommunitiesRoute: typeof CommunitiesRoute
+  CompoundRoute: typeof CompoundRoute
   DamRoute: typeof DamRoute
   HelplineRoute: typeof HelplineRoute
   HomeRoute: typeof HomeRoute
@@ -233,6 +246,13 @@ declare module '@tanstack/react-router' {
       path: '/communities'
       fullPath: '/communities'
       preLoaderRoute: typeof CommunitiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compound': {
+      id: '/compound'
+      path: '/compound'
+      fullPath: '/compound'
+      preLoaderRoute: typeof CompoundRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dam': {
@@ -319,6 +339,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlertsRoute: AlertsRoute,
   CommunitiesRoute: CommunitiesRoute,
+  CompoundRoute: CompoundRoute,
   DamRoute: DamRoute,
   HelplineRoute: HelplineRoute,
   HomeRoute: HomeRoute,

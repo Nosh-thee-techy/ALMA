@@ -1,17 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { AppShell } from "@/components/turkana/AppShell";
-import { SectorGuidance } from "@/components/turkana/SectorGuidance";
-import { RequireAuth } from "@/lib/require-auth";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+/** Former Sector Guidance page — merged into Helpline. */
 export const Route = createFileRoute("/sector-guidance")({
-  head: () => ({
-    meta: [{ title: "What to do — ALMA" }],
-  }),
-  component: () => (
-    <RequireAuth>
-      <AppShell showRegion={false}>
-        <SectorGuidance />
-      </AppShell>
-    </RequireAuth>
-  ),
+  beforeLoad: () => {
+    throw redirect({ to: "/helpline", hash: "guidance" });
+  },
 });

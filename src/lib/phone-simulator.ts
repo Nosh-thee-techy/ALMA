@@ -62,12 +62,14 @@ export function simUssd(params: {
   phone: string;
   text: string;
   reset?: boolean;
+  serviceCode?: string;
 }) {
   return postJson<UssdSimResult>("/api/simulator/phone/ussd", {
     session_id: params.sessionId,
     phone: params.phone,
     text: params.text,
     reset: params.reset ?? false,
+    service_code: params.serviceCode,
   });
 }
 
@@ -132,13 +134,50 @@ export function sendSimSms(params: {
   sector?: string;
   region_id?: string;
 }) {
-  return postJson<{ ok: boolean; preview: SmsPreview; sms: { mode?: string; ok?: boolean } }>(
-    "/api/simulator/phone/sms-send",
-    {
-      phone: params.phone,
-      lang: params.lang ?? "en",
-      sector: params.sector ?? "pastoralist",
-      region_id: params.region_id ?? "turkana",
-    },
-  );
+  return postJson<{
+    ok: boolean;
+    preview: SmsPreview;
+    sms: { mode?: string; ok?: boolean; status?: number };
+    shortcode?: string;
+  }>("/api/simulator/phone/sms-send", {
+    phone: params.phone,
+    lang: params.lang ?? "en",
+    sector: params.sector ?? "pastoralist",
+    region_id: params.region_id ?? "turkana",
+  });
+}
+
+export function sendInboundSms(params: { phone: string; text: string; to?: string }) {
+  return postJson<{
+    ok: boolean;
+    status: number;
+    shortcode: string;
+    from: string;
+    text: string;
+    result: {
+      ok?: boolean;
+      handled?: string;
+      path?: string | null;
+      confirm_message?: string;
+      sms?: { mode?: string; status?: number };
+      notify?: Array<{ to?: string; wa?: { mode?: string; status?: number } }>;
+    };
+  }>("/api/simulator/phone/sms-inbound", {
+    phone: params.phone,
+    text: params.text,
+    to: params.to,
+  });
+}
+
+export function fetchPhoneCodes() {
+  return fetch(`${engineBaseUrl()}/api/simulator/phone/codes`).then(async (res) => {
+    if (!res.ok) throw new Error(`codes → ${res.status}`);
+    return res.json() as Promise<{
+      ok: boolean;
+      sms_shortcode: string;
+      ussd_dial: string;
+      sos_ussd_dial: string;
+      hint: string;
+    }>;
+  });
 }

@@ -8,7 +8,7 @@ export type TriggerType = "rain" | "dam" | "compound";
 // Ground-truth verification state of a dispatched alert. This closes the
 // two-way loop: field reports feed back and adjust system confidence.
 export type VerificationState = "unconfirmed" | "confirmed" | "false-alarm";
-export type LastReachedVia = "SMS" | "USSD" | "Voice" | "Unreached";
+export type LastReachedVia = "SMS" | "USSD" | "Voice" | "Manual" | "Unreached";
 
 export interface TriggerStatus {
   tier: RiskTier;
@@ -24,7 +24,16 @@ export interface Community {
   name: string;
   region: "Kenya" | "Ethiopia";
   side: "turkana" | "omo";
+  /** People in/near flood-exposed settlement — planning estimate, not a live census. */
   population: number;
+  /** Approx. households in the exposed zone (planning estimate). */
+  households: number;
+  /** Dominant livelihood for sector playbooks. */
+  primaryLivelihood: string;
+  /** Admin / place label (ward, kebele, lakeshore strip). */
+  areaLabel: string;
+  /** Short note on who is exposed and where. */
+  exposureNote: string;
   distanceFromDamKm: number;
   distanceFromCatchmentKm: number;
   rainEtaHours: number;
@@ -32,6 +41,8 @@ export interface Community {
   tier: RiskTier;
   lastAlert: string;
   lastReachedVia?: LastReachedVia;
+  /** Unix seconds when lastReachedVia was last updated (when known). */
+  lastReachedAt?: number | null;
   // Position on our schematic map (0-100 % of viewbox)
   x: number;
   y: number;
@@ -156,6 +167,10 @@ export const communities: Community[] = [
     region: "Ethiopia",
     side: "omo",
     population: 8400,
+    households: 1400,
+    primaryLivelihood: "Riverine farming & livestock",
+    areaLabel: "Lower Omo · Dasenech kebele strip",
+    exposureNote: "Floodplain farms and settlement along the Omo before the lake delta.",
     distanceFromDamKm: 465,
     distanceFromCatchmentKm: 40,
     rainEtaHours: 6,
@@ -171,6 +186,10 @@ export const communities: Community[] = [
     region: "Ethiopia",
     side: "omo",
     population: 3200,
+    households: 530,
+    primaryLivelihood: "Agro-pastoral",
+    areaLabel: "Lower Omo · mid-reach settlement",
+    exposureNote: "Homesteads and dry-season gardens on the river corridor south of Omorate.",
     distanceFromDamKm: 495,
     distanceFromCatchmentKm: 70,
     rainEtaHours: 9,
@@ -186,6 +205,10 @@ export const communities: Community[] = [
     region: "Kenya",
     side: "turkana",
     population: 5100,
+    households: 850,
+    primaryLivelihood: "Livestock & fishing",
+    areaLabel: "Turkana North · Omo delta / lakeshore",
+    exposureNote: "Cross-border grazing and fishing camps where the Omo meets Lake Turkana.",
     distanceFromDamKm: 540,
     distanceFromCatchmentKm: 115,
     rainEtaHours: 13,
@@ -201,6 +224,10 @@ export const communities: Community[] = [
     region: "Kenya",
     side: "turkana",
     population: 2700,
+    households: 450,
+    primaryLivelihood: "Livestock",
+    areaLabel: "West Turkana · west lakeshore",
+    exposureNote: "Pastoral settlement on low ground near seasonal inlets to the lake.",
     distanceFromDamKm: 580,
     distanceFromCatchmentKm: 155,
     rainEtaHours: 17,
@@ -216,6 +243,10 @@ export const communities: Community[] = [
     region: "Kenya",
     side: "turkana",
     population: 6200,
+    households: 1030,
+    primaryLivelihood: "Fishing & livestock",
+    areaLabel: "Turkana North · lakeshore town",
+    exposureNote: "Larger lakeshore hub — fish landing, markets, and nearby manyattas.",
     distanceFromDamKm: 610,
     distanceFromCatchmentKm: 185,
     rainEtaHours: 20,
@@ -231,6 +262,10 @@ export const communities: Community[] = [
     region: "Kenya",
     side: "turkana",
     population: 12500,
+    households: 2100,
+    primaryLivelihood: "Fishing, trade & livestock",
+    areaLabel: "Turkana Central · Kalokol ward",
+    exposureNote: "Main lakeshore trading centre; flood risk lower but still tracks lake rise.",
     distanceFromDamKm: 680,
     distanceFromCatchmentKm: 255,
     rainEtaHours: 28,
@@ -246,6 +281,10 @@ export const communities: Community[] = [
     region: "Kenya",
     side: "turkana",
     population: 1800,
+    households: 300,
+    primaryLivelihood: "Tourism support & livestock",
+    areaLabel: "Turkana Central · west lakeshore",
+    exposureNote: "Smaller lakeshore community south of Kalokol; later wave arrival.",
     distanceFromDamKm: 710,
     distanceFromCatchmentKm: 285,
     rainEtaHours: 32,
@@ -340,28 +379,28 @@ export const tierMeta: Record<
     dot: "bg-risk-safe",
     badge: "bg-risk-safe-bg text-risk-safe-foreground",
     ring: "ring-risk-safe/40",
-    text: "text-risk-safe-foreground",
+    text: "text-risk-safe",
   },
   watch: {
     label: "Watch",
     dot: "bg-risk-watch",
     badge: "bg-risk-watch-bg text-risk-watch-foreground",
     ring: "ring-risk-watch/50",
-    text: "text-risk-watch-foreground",
+    text: "text-risk-watch",
   },
   warning: {
     label: "Warning",
     dot: "bg-risk-warning",
     badge: "bg-risk-warning-bg text-risk-warning-foreground",
     ring: "ring-risk-warning/60",
-    text: "text-risk-warning-foreground",
+    text: "text-risk-warning",
   },
   severe: {
     label: "Severe",
     dot: "bg-risk-severe",
     badge: "bg-risk-severe text-risk-severe-foreground",
     ring: "ring-risk-severe/70",
-    text: "text-risk-severe-foreground",
+    text: "text-risk-severe",
   },
 };
 

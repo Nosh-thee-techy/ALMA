@@ -178,9 +178,12 @@ export function StatusCard({
             asChild
             size="sm"
             variant={severeCompound ? "secondary" : "default"}
-            className={cn(severeCompound && "bg-white text-risk-severe hover:bg-white/90")}
+            className={cn(
+              severeCompound &&
+                "bg-white text-[oklch(0.35_0.16_28)] hover:bg-white/90 dark:bg-card dark:text-foreground",
+            )}
           >
-            <Link to="/sector-guidance">Open sector playbooks</Link>
+            <Link to="/helpline">Open sector playbooks</Link>
           </Button>
           <Button
             asChild

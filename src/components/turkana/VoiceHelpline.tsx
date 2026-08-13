@@ -1,6 +1,6 @@
-// Voice agent — quick spoken risk breakdown + farmer helpline controls.
+// Alma — female Early Action voice agent for desk officers + farmer phone.
 import { useEffect, useState } from "react";
-import { Headphones, Loader2, PhoneCall, Volume2 } from "lucide-react";
+import { Loader2, PhoneCall, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { engineBaseUrl } from "@/lib/alma-engine";
@@ -16,6 +16,7 @@ type Brief = {
   tts_mode?: string;
   tts_note?: string;
   rain_mm?: number;
+  agent?: string;
 };
 
 type TtsHealth = {
@@ -28,9 +29,12 @@ type TtsHealth = {
 export function VoiceHelpline({
   wardId = "kalokol",
   className,
+  autoBrief = true,
 }: {
   wardId?: string;
   className?: string;
+  /** When true, Alma greets organizers with a live brief as soon as the desk loads. */
+  autoBrief?: boolean;
 }) {
   const [ward, setWard] = useState(wardId);
   const [lang, setLang] = useState<"en" | "sw">("en");
@@ -38,6 +42,7 @@ export function VoiceHelpline({
   const [loading, setLoading] = useState(false);
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
   const [ttsHealth, setTtsHealth] = useState<TtsHealth | null>(null);
+  const [speaking, setSpeaking] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,51 +57,90 @@ export function VoiceHelpline({
     };
   }, []);
 
-  async function speakBreakdown() {
+  async function speakBreakdown(opts?: { silentToast?: boolean; includeAudio?: boolean }) {
     setLoading(true);
     try {
       const res = await fetch(`${engineBaseUrl()}/api/dashboard/voice-brief`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ ward_id: ward, lang }),
+        body: JSON.stringify({
+          ward_id: ward,
+          lang,
+          audience: "organizer",
+          // Auto-load text only — ElevenLabs synthesis was blocking page feel.
+          include_audio: opts?.includeAudio ?? true,
+        }),
       });
       if (!res.ok) throw new Error(`Engine ${res.status}`);
       const json = (await res.json()) as Brief;
       setBrief(json);
-      if (json.audio_url) {
+      if (json.audio_url && (opts?.includeAudio ?? true)) {
         audioEl?.pause();
         const a = new Audio(json.audio_url);
         setAudioEl(a);
+        setSpeaking(true);
+        a.onended = () => setSpeaking(false);
+        a.onpause = () => setSpeaking(false);
         void a.play().catch(() => {
-          toast.message("Audio ready — tap play if autoplay is blocked.");
+          setSpeaking(false);
+          if (!opts?.silentToast) {
+            toast.message("Alma’s audio is ready — tap play if autoplay is blocked.");
+          }
         });
-        toast.success("Voice agent briefing ready");
-      } else {
-        toast.message("Script ready", {
-          description: json.tts_note || "ElevenLabs offline — reading text on desk.",
+        if (!opts?.silentToast) toast.success("Alma is briefing you");
+      } else if (!opts?.silentToast) {
+        toast.message("Alma’s script is ready", {
+          description: json.tts_note || "Tap Ask Alma again with voice when you want audio.",
         });
       }
     } catch (e) {
-      toast.error("Voice brief failed", {
-        description: e instanceof Error ? e.message : "Engine unreachable",
-      });
+      if (!opts?.silentToast) {
+        toast.error("Alma could not brief you", {
+          description: e instanceof Error ? e.message : "Engine unreachable",
+        });
+      }
     } finally {
       setLoading(false);
     }
   }
 
+  // Fast text brief on desk open — no TTS wait.
+  useEffect(() => {
+    if (!autoBrief) return;
+    void speakBreakdown({ silentToast: true, includeAudio: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional first-load brief only
+  }, [autoBrief]);
+
   return (
     <div className={cn("rounded-xl border border-border bg-card", className)}>
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3 sm:px-5">
         <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Headphones className="h-5 w-5" aria-hidden />
-          </span>
+          <div className="relative shrink-0">
+            <img
+              src="/alma-agent-portrait.png"
+              alt="Alma, ALMA Early Action voice agent"
+              className={cn(
+                "h-14 w-14 rounded-full object-cover shadow-sm ring-2 ring-primary/30",
+                speaking && "ring-act ring-offset-2 ring-offset-card",
+              )}
+            />
+            <span
+              className={cn(
+                "absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card",
+                speaking ? "bg-act animate-pulse" : "bg-risk-safe",
+              )}
+              aria-hidden
+            />
+          </div>
           <div>
-            <h2 className="text-sm font-bold">Voice agent helpline</h2>
-            <p className="text-xs text-muted-foreground">
-              Breaks risk into a short spoken brief for officers — and the same script powers the
-              farmer phone menu.
+            <p className="text-[11px] font-bold uppercase tracking-wide text-primary">
+              Voice agent · Alma
+            </p>
+            <h2 className="text-sm font-bold">Meet Alma</h2>
+            <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
+              Alma is your Early Action voice agent. She turns dam + rain risk into a short plain
+              brief for organizers on this desk, and answers farmers on the phone helpline in the
+              same calm voice.
             </p>
             {ttsHealth && (
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -109,7 +153,8 @@ export function VoiceHelpline({
                   )}
                   title={ttsHealth.elevenlabs?.note || undefined}
                 >
-                  ElevenLabs {ttsHealth.elevenlabs?.ok ? "live" : ttsHealth.elevenlabs?.mode || "off"}
+                  Alma voice{" "}
+                  {ttsHealth.elevenlabs?.ok ? "live" : ttsHealth.elevenlabs?.mode || "text-only"}
                 </span>
                 <span
                   className={cn(
@@ -119,7 +164,7 @@ export function VoiceHelpline({
                       : "bg-muted text-muted-foreground",
                   )}
                 >
-                  Featherless {ttsHealth.featherless?.configured ? "ready" : "off"}
+                  Language assist {ttsHealth.featherless?.configured ? "ready" : "off"}
                 </span>
               </div>
             )}
@@ -127,10 +172,31 @@ export function VoiceHelpline({
         </div>
       </div>
 
+      {/* Alma’s outlook — who she helps */}
+      <div className="grid gap-3 border-b border-border bg-dust/40 px-4 py-3 sm:grid-cols-2 sm:px-5">
+        <div className="rounded-lg border border-border/70 bg-card px-3 py-2.5">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-primary">
+            For organizers
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            On desk open, Alma briefs the selected ward: flood tier, upstream rain, dam pressure,
+            and the next sector action — so you act before scrolling charts.
+          </p>
+        </div>
+        <div className="rounded-lg border border-border/70 bg-card px-3 py-2.5">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-primary">For farmers</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Same Alma answers feature phones via Africa&apos;s Talking voice and USSD{" "}
+            <strong className="text-foreground">*384*96428#</strong> — live risk, what to do, river
+            report.
+          </p>
+        </div>
+      </div>
+
       <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5">
         <div className="space-y-3">
           <label className="block text-xs font-bold text-muted-foreground">
-            Area
+            Alma briefs this area
             <select
               className="mt-1 flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium"
               value={ward}
@@ -164,7 +230,7 @@ export function VoiceHelpline({
           <Button
             type="button"
             className="w-full gap-2 bg-act font-bold text-act-foreground hover:bg-act/90"
-            onClick={speakBreakdown}
+            onClick={() => void speakBreakdown({ includeAudio: true })}
             disabled={loading}
           >
             {loading ? (
@@ -172,18 +238,29 @@ export function VoiceHelpline({
             ) : (
               <Volume2 className="h-4 w-4" />
             )}
-            {loading ? "Preparing brief…" : "Play quick breakdown"}
+            {loading ? "Alma is preparing…" : "Ask Alma for a quick breakdown"}
           </Button>
           {brief?.text && (
             <blockquote className="rounded-md border border-border bg-dust/60 p-3 text-sm leading-relaxed">
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-primary">
+                Alma says
+              </p>
               “{brief.text}”
               <footer className="mt-2 text-xs text-muted-foreground">
-                {brief.place} · {brief.tier} · TTS {brief.tts_mode || "—"}
+                {brief.place} · {brief.tier} · {brief.tts_mode || "text"}
               </footer>
             </blockquote>
           )}
           {brief?.audio_url && (
-            <audio controls className="w-full" src={brief.audio_url} preload="none">
+            <audio
+              controls
+              className="w-full"
+              src={brief.audio_url}
+              preload="none"
+              onPlay={() => setSpeaking(true)}
+              onPause={() => setSpeaking(false)}
+              onEnded={() => setSpeaking(false)}
+            >
               <track kind="captions" />
             </audio>
           )}
@@ -192,12 +269,12 @@ export function VoiceHelpline({
         <div className="rounded-lg border border-border bg-background p-4">
           <div className="flex items-center gap-2 text-sm font-bold">
             <PhoneCall className="h-4 w-4 text-primary" aria-hidden />
-            Farmer helpline
+            Alma on farmer helpline
           </div>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             Feature phones call the Africa&apos;s Talking voice number (callback{" "}
-            <code className="text-foreground">/api/voice</code>). Same agent answers in plain
-            language.
+            <code className="text-foreground">/api/voice</code>). Alma answers in plain language —
+            the same agent as this desk brief.
           </p>
           <ol className="mt-3 space-y-1.5 text-sm">
             <li>
@@ -214,7 +291,7 @@ export function VoiceHelpline({
             </li>
           </ol>
           <div className="mt-4 rounded-md bg-dust px-3 py-2">
-            <p className="text-xs text-muted-foreground">No smartphone? USSD</p>
+            <p className="text-xs text-muted-foreground">No smartphone? Ask Alma on USSD</p>
             <p className="text-lg font-bold tabular-nums">*384*96428#</p>
           </div>
         </div>

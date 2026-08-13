@@ -1,13 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/turkana/AppShell";
+import { SectorGuidance } from "@/components/turkana/SectorGuidance";
 import { VoiceHelpline } from "@/components/turkana/VoiceHelpline";
-import { WeatherHeatMap } from "@/components/turkana/WeatherHeatMap";
 import { RequireAuth } from "@/lib/require-auth";
-import { useState } from "react";
 
 export const Route = createFileRoute("/helpline")({
   head: () => ({
-    meta: [{ title: "Voice helpline — ALMA" }],
+    meta: [{ title: "Helpline & what to do — ALMA" }],
   }),
   component: () => (
     <RequireAuth>
@@ -17,23 +16,24 @@ export const Route = createFileRoute("/helpline")({
 });
 
 function HelplinePage() {
-  const [wardId, setWardId] = useState("kalokol");
-
   return (
-    <AppShell>
+    <AppShell showRegion={false}>
       <header className="mb-6">
-        <p className="text-sm font-bold text-primary">Farmer helpline + desk brief</p>
+        <p className="text-sm font-bold text-primary">Helpline · sector playbooks</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
-          Hear the risk in plain words
+          Hear the risk · tell people what to do
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Pick a ward on the map, then play the voice agent breakdown. Farmers without data use the
-          phone menu or USSD <strong className="text-foreground">*384*96428#</strong>.
+          Same job in one place: Alma briefs the desk and farmers by voice, then sector playbooks
+          show the before/after actions to send. USSD{" "}
+          <strong className="text-foreground">*384*96428#</strong> for phones without data.
         </p>
       </header>
-      <div className="space-y-5">
-        <WeatherHeatMap onSelectWard={(w) => setWardId(w.wardId)} />
-        <VoiceHelpline wardId={wardId} key={wardId} />
+      <div className="space-y-8">
+        <VoiceHelpline />
+        <section id="guidance" aria-label="Sector playbooks">
+          <SectorGuidance />
+        </section>
       </div>
     </AppShell>
   );

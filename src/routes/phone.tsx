@@ -2,15 +2,16 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { AlmaLogo } from "@/components/turkana/AlmaLogo";
 import { PhoneSimulator } from "@/components/turkana/PhoneSimulator";
 import { Button } from "@/components/ui/button";
+import { smsShortcode } from "@/lib/sms-shortcode";
+import { ussdDialCode } from "@/lib/ussd-dial";
 
 export const Route = createFileRoute("/phone")({
   head: () => ({
     meta: [
-      { title: "Feature phone simulator — ALMA" },
+      { title: "Feature phone demo — ALMA" },
       {
         name: "description",
-        content:
-          "Simulate USSD, SMS, and voice helpline on a feature phone — rehearse farmer last-mile channels.",
+        content: `One-screen feature phone demo: SMS shortcode ${smsShortcode}, USSD ${ussdDialCode}, and voice helpline.`,
       },
     ],
   }),
@@ -26,9 +27,14 @@ function PhoneSimulatorPage() {
             <AlmaLogo className="h-9 w-9 rounded-lg object-cover" />
             <span className="font-bold">ALMA</span>
           </Link>
-          <Button asChild variant="outline" size="sm" className="font-bold">
-            <Link to="/">Back to home</Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="hidden font-mono text-xs text-muted-foreground sm:inline">
+              SMS {smsShortcode} · {ussdDialCode}
+            </span>
+            <Button asChild variant="outline" size="sm" className="font-bold">
+              <Link to="/home">Desk home</Link>
+            </Button>
+          </div>
         </div>
       </header>
       <PhoneSimulator />
